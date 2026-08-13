@@ -7,7 +7,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gio, Gtk  # noqa: E402
 
 from ..gobjects import TreeNode, build_world_nodes  # noqa: E402
 from ..models import Character, World, format_playtime  # noqa: E402
@@ -29,9 +29,9 @@ class WorldsView(Gtk.Box):
 
         tree = Gtk.TreeListModel.new(
             self._root,
-            passthrough=False,
-            autoexpand=False,
-            create_func=lambda node: node.child_model(),
+            False,  # passthrough: die Zeilen liefern Gtk.TreeListRow
+            False,  # autoexpand: der Baum startet zugeklappt
+            _create_child_model,
         )
         self._filter = Gtk.CustomFilter.new(self._match)
         self._model = Gtk.FilterListModel.new(tree, self._filter)
@@ -147,12 +147,21 @@ class WorldsView(Gtk.Box):
         self._reload()
 
     def _set_all_expanded(self, expanded: bool) -> None:
-        """Klappe alle Zonen der obersten Ebene auf oder zu."""
+        """Klappe alle Zonen der obersten Ebene auf oder zu.
+
+        Erst sammeln, dann umschalten: das Aufklappen fuegt Kindzeilen ins
+        Modell ein, wodurch sich waehrend einer Schleife ueber die Indizes
+        alles Nachfolgende verschieben wuerde.
+        """
         model = self._list.get_model()
-        for index in range(model.get_n_items()):
-            row = model.get_item(index)
-            if isinstance(row, Gtk.TreeListRow) and row.get_depth() == 0:
-                row.set_expanded(expanded)
+        rows = [
+            row
+            for index in range(model.get_n_items())
+            if isinstance(row := model.get_item(index), Gtk.TreeListRow) and row.get_depth() == 0
+        ]
+
+        for row in rows:
+            row.set_expanded(expanded)
 
     # ------------------------------------------------------------------
     # Befuellen
@@ -208,6 +217,11 @@ def _world_summary(world: World | None) -> str:
     return " · ".join(parts)
 
 
+def _create_child_model(node: TreeNode, *_user_data) -> Gio.ListStore | None:
+    """Kinder eines Knotens - Gtk.TreeListModel fragt beim Aufklappen danach."""
+    return node.child_model()
+
+
 def _setup_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
     expander = Gtk.TreeExpander(
         indent_for_depth=True,
@@ -259,10 +273,12 @@ def _bind_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> N
     else:
         box.r2wa_icon.set_visible(False)
 
-    box.r2wa_title.set_label(GLib.markup_escape_text(node.title))
+    # Gtk.Label stellt Text ohne Markup dar - hier darf nicht maskiert werden,
+    # sonst erschiene ein "&" im Item-Namen als "&amp;".
+    box.r2wa_title.set_label(node.title)
     box.r2wa_title.set_css_classes(["dim-label"] if node.dim else [])
 
-    box.r2wa_subtitle.set_label(GLib.markup_escape_text(node.subtitle))
+    box.r2wa_subtitle.set_label(node.subtitle)
     box.r2wa_subtitle.set_visible(bool(node.subtitle))
 
     box.r2wa_badge.set_label(node.badge)

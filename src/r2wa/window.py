@@ -49,7 +49,9 @@ class Window(Adw.ApplicationWindow):
         self._items_view = ItemsView()
         self._worlds_view = WorldsView()
 
-        self._stack = Adw.ViewStack()
+        # vexpand ist noetig, weil der Stack in einer Box unter dem Banner
+        # sitzt und Box-Kinder sonst nur ihre Mindesthoehe bekommen.
+        self._stack = Adw.ViewStack(vexpand=True)
         self._stack.add_titled_with_icon(
             self._items_view, "items", "Items", "view-list-bullet-symbolic"
         )
@@ -227,7 +229,9 @@ class Window(Adw.ApplicationWindow):
                 "oder setze R2WA_PARSER auf den Pfad des Binaries."
             )
         else:
-            description = str(error)
+            # Fehlertexte enthalten Pfade und Meldungen des Parsers;
+            # Adw.StatusPage rendert die Beschreibung als Markup.
+            description = GLib.markup_escape_text(str(error))
 
         self._show_placeholder("Analyse fehlgeschlagen", description)
 
@@ -370,8 +374,9 @@ class _CharacterRow(Gtk.ListBoxRow):
         )
 
         title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        # Gtk.Label stellt Text ohne Markup dar, deshalb unmaskiert.
         title = Gtk.Label(
-            label=GLib.markup_escape_text(character.title),
+            label=character.title,
             xalign=0.0,
             hexpand=True,
             ellipsize=Pango.EllipsizeMode.END,
