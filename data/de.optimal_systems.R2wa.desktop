@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Remnant 2 Analyzer
+GenericName=Savegame-Analyse
+Comment=Zeigt gefundene und fehlende Items sowie die gerollten Welten
+Categories=Game;Utility;
+Keywords=Remnant;Savegame;Items;
+Exec=r2wa %f
+Icon=de.optimal_systems.R2wa
+Terminal=false
+StartupNotify=true

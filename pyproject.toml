@@ -1,0 +1,34 @@
+[project]
+name = "r2wa"
+version = "0.1.0"
+description = "Remnant 2 World & Item Analyzer fuer GNOME"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+# PyGObject wird bewusst nicht als Dependency gefuehrt: unter GNOME kommt es
+# aus der Distribution (python3-gi), ein pip-Build braucht die kompletten
+# GTK-Header und schlaegt auf dem Windows-Entwicklungsrechner ohnehin fehl.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[project.scripts]
+r2wa = "r2wa.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]

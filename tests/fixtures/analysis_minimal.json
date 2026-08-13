@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "generator": { "parser": "0.1.0", "analyzer": "2.0.3" },
+  "save_dir": "/home/tester/saves/76561190000000000",
+  "active_character_index": 1,
+  "account_awards": ["AccountAward_FinishCampaign_Veteran"],
+  "catalog": [
+    {
+      "id": "Ring_ProbabilityCord",
+      "name": "Probability Cord",
+      "category": "ring",
+      "world": "World_Yaesha",
+      "drop_type": "Location",
+      "drop_reference": "The Far Woods",
+      "note": "Zufallsfund im Ueberland"
+    },
+    {
+      "id": "Ring_RingOfTheAdmiral",
+      "name": "Worn Admiral's Ring",
+      "category": "ring",
+      "world": "World_Base",
+      "drop_type": "Vendor",
+      "drop_reference": "Reggie"
+    },
+    {
+      "id": "Amulet_ButchersFetish",
+      "name": "Butcher's Fetish",
+      "category": "amulet",
+      "world": "World_Base",
+      "drop_type": "Vendor",
+      "drop_reference": "Reggie",
+      "prerequisite": "AccountAward_FinishCampaign_Veteran",
+      "account_award": true
+    },
+    {
+      "id": "Weapon_AlphaOmega",
+      "name": "Alpha / Omega",
+      "category": "weapon",
+      "subcategory": "Long Gun",
+      "world": "World_Root",
+      "drop_type": "Boss",
+      "drop_reference": "Annihilation"
+    },
+    {
+      "id": "Weapon_DecayedClaws",
+      "name": "Decayed Claws",
+      "category": "weapon",
+      "subcategory": "Melee Weapon",
+      "world": "World_Root",
+      "coop_only": true
+    },
+    {
+      "id": "Trait_Chakra",
+      "name": "Chakra",
+      "category": "trait",
+      "world": "World_Yaesha"
+    },
+    {
+      "id": "Consumable_MysteryItem",
+      "name": "Consumable_MysteryItem",
+      "category": "consumable"
+    }
+  ],
+  "characters": [
+    {
+      "index": 0,
+      "archetype": "Invoker",
+      "secondary_archetype": "Ritualist",
+      "gender": "Male",
+      "power_level": 19,
+      "item_level": 20,
+      "trait_rank": 85,
+      "trait_points": 4,
+      "is_hardcore": false,
+      "save_datetime": "2026-01-10T18:26:02Z",
+      "active_world_slot": "campaign",
+      "playtime_seconds": 57420.0,
+      "counts": {
+        "acquired": 3,
+        "missing": 4,
+        "total": 7,
+        "acquired_reported": 3,
+        "by_category": {
+          "ring": { "acquired": 1, "total": 2 },
+          "amulet": { "acquired": 0, "total": 1 },
+          "weapon": { "acquired": 1, "total": 2 },
+          "trait": { "acquired": 1, "total": 1 },
+          "consumable": { "acquired": 0, "total": 1 }
+        }
+      },
+      "item_states": [
+        { "id": "Ring_ProbabilityCord", "acquired": true, "level": 0, "quantity": 1 },
+        {
+          "id": "Ring_RingOfTheAdmiral",
+          "acquired": false,
+          "obtainable_in_campaign": true,
+          "obtainable_in_adventure": true
+        },
+        {
+          "id": "Amulet_ButchersFetish",
+          "acquired": false,
+          "obtainable_in_campaign": false,
+          "obtainable_in_adventure": false
+        },
+        { "id": "Weapon_AlphaOmega", "acquired": true, "level": 20, "is_equipped": true },
+        {
+          "id": "Weapon_DecayedClaws",
+          "acquired": false,
+          "obtainable_in_campaign": true,
+          "obtainable_in_adventure": false
+        },
+        { "id": "Trait_Chakra", "acquired": true, "quantity": 10 },
+        { "id": "Consumable_MysteryItem", "acquired": false }
+      ],
+      "worlds": [
+        {
+          "slot": "campaign",
+          "difficulty": "Veteran",
+          "playtime_seconds": 57436.0,
+          "respawn_point": "Ward 13",
+          "zones": [
+            {
+              "name": "Ward 13",
+              "story": "Ward 13",
+              "finished": true,
+              "completes_biome": false,
+              "locations": [
+                {
+                  "name": "Ward 13",
+                  "category": "Base",
+                  "world": "Ward 13",
+                  "world_stones": ["Ward 13"],
+                  "vendors": ["Reggie", "Brabus"],
+                  "loot_groups": [
+                    {
+                      "type": "vendor",
+                      "name": "Reggie",
+                      "items": [
+                        {
+                          "id": "Ring_RingOfTheAdmiral",
+                          "name": "Worn Admiral's Ring",
+                          "category": "ring",
+                          "is_looted": false
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "Yaesha",
+              "story": "Empress",
+              "finished": false,
+              "completes_biome": true,
+              "locations": [
+                {
+                  "name": "The Far Woods",
+                  "category": "Overworld",
+                  "world": "Yaesha",
+                  "world_stones": ["The Far Woods"],
+                  "connections": ["The Nameless Nest"],
+                  "trait_book": true,
+                  "trait_book_looted": false,
+                  "simulacrum": true,
+                  "simulacrum_looted": true,
+                  "bloodmoon": true,
+                  "loot_groups": [
+                    {
+                      "type": "location",
+                      "event_drop_reference": "Quest_Yaesha_Empress",
+                      "items": [
+                        {
+                          "id": "Ring_ProbabilityCord",
+                          "name": "Probability Cord",
+                          "category": "ring",
+                          "is_looted": true
+                        },
+                        {
+                          "id": "Trait_Chakra",
+                          "name": "Chakra",
+                          "category": "trait",
+                          "is_looted": false,
+                          "is_prerequisite_missing": true
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "slot": "adventure",
+          "difficulty": "Survivor",
+          "playtime_seconds": 71.0,
+          "zones": []
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "archetype": "Invader",
+      "power_level": 3,
+      "item_level": 4,
+      "trait_rank": 6,
+      "is_hardcore": true,
+      "save_datetime": "2026-01-15T23:33:14Z",
+      "active_world_slot": "adventure",
+      "playtime_seconds": 17640.0,
+      "counts": {
+        "acquired": 2,
+        "missing": 5,
+        "total": 7,
+        "acquired_reported": 2,
+        "by_category": {
+          "ring": { "acquired": 0, "total": 2 },
+          "amulet": { "acquired": 1, "total": 1 },
+          "weapon": { "acquired": 1, "total": 2 },
+          "trait": { "acquired": 0, "total": 1 },
+          "consumable": { "acquired": 0, "total": 1 }
+        }
+      },
+      "item_states": [
+        { "id": "Ring_ProbabilityCord", "acquired": false },
+        { "id": "Ring_RingOfTheAdmiral", "acquired": false, "obtainable_in_campaign": true },
+        { "id": "Amulet_ButchersFetish", "acquired": true, "quantity": 1 },
+        { "id": "Weapon_AlphaOmega", "acquired": false },
+        { "id": "Weapon_DecayedClaws", "acquired": true, "level": 5 },
+        { "id": "Trait_Chakra", "acquired": false },
+        { "id": "Consumable_MysteryItem", "acquired": false }
+      ],
+      "worlds": []
+    }
+  ],
+  "warnings": ["Slot 0: Erreichbarkeit von 'Amulet_OneTrueKingSigil' nicht bestimmbar."]
+}

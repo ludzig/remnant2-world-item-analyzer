@@ -1,0 +1,8 @@
+# Zielplattform ist Linux - Zeilenenden im Repo immer LF,
+# damit auf Windows bearbeitete Dateien dort nicht als CRLF landen.
+* text=auto eol=lf
+
+# Savegame-Fixtures sind binaer und duerfen nie angefasst werden.
+*.sav binary
+*.png binary
+*.svg text eol=lf

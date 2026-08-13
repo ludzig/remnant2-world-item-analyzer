@@ -1,0 +1,26 @@
+# .NET
+bin/
+obj/
+*.user
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Build output
+build/
+dist/
+src/r2wa/ui/*.ui
+
+# Editor
+.vscode/
+.idea/
+
+# Local overrides
+.env
+local.just
