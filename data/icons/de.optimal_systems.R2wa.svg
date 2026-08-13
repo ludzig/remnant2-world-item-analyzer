@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- App-Icon: ein Ring als Sinnbild fuer die Sammelobjekte, mit Haken fuer
+       das Abgehakte. Groesse und Rand folgen den GNOME-Icon-Vorgaben. -->
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3d3846"/>
+      <stop offset="1" stop-color="#241f31"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f9f06b"/>
+      <stop offset="0.5" stop-color="#f5c211"/>
+      <stop offset="1" stop-color="#e5a50a"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#ground)"/>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="none"
+        stroke="#000" stroke-opacity="0.25" stroke-width="1"/>
+
+  <!-- Der Ring, leicht nach links oben versetzt, damit der Haken Platz hat -->
+  <circle cx="56" cy="54" r="26" fill="none" stroke="url(#ring)" stroke-width="11"/>
+  <circle cx="56" cy="54" r="26" fill="none" stroke="#000" stroke-opacity="0.18"
+          stroke-width="11" stroke-dasharray="40 200" stroke-dashoffset="-95"/>
+
+  <!-- Haken rechts unten, abgesetzt durch einen dunklen Saum -->
+  <path d="M 62 86 L 78 102 L 106 68" fill="none" stroke="#241f31"
+        stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 62 86 L 78 102 L 106 68" fill="none" stroke="#57e389"
+        stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

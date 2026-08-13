@@ -17,6 +17,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from .config import user_home
+
 #: Steam-App-ID von Remnant II - benennt den compatdata-Ordner des Prefix.
 GAME_APP_ID = "1282100"
 
@@ -151,7 +153,7 @@ def compat_save_dirs(library: Path) -> list[Path]:
 def discover(
     home: Path | None = None,
     extra_paths: tuple[Path, ...] | list[Path] = (),
-) -> list[SaveLocation]:
+) -> list[SaveLocation]:  # noqa: C901 - die Kandidatensuche ist bewusst linear
     """Finde alle Savegame-Verzeichnisse.
 
     *extra_paths* sind manuell konfigurierte Verzeichnisse; sie werden zuerst
@@ -162,8 +164,11 @@ def discover(
     Mehrere Treffer werden bewusst alle zurueckgegeben statt still den ersten
     zu waehlen - bei zwei Steam-Accounts auf einer Maschine waere die Auswahl
     sonst geraten.
+
+    Laesst sich das Home-Verzeichnis nicht bestimmen, entfaellt nur die
+    automatische Suche; uebergebene Pfade werden weiterhin geprueft.
     """
-    home = home or Path.home()
+    home = home or user_home()
     found: list[SaveLocation] = []
     seen: set[Path] = set()
 
@@ -172,6 +177,9 @@ def discover(
         if location and location.path.resolve() not in seen:
             seen.add(location.path.resolve())
             found.append(location)
+
+    if home is None:
+        return found
 
     auto: list[SaveLocation] = []
     for candidate, source in _auto_candidates(home):

@@ -221,3 +221,20 @@ class TestDiscover:
         (tmp_path / ".steam" / "steam" / "steamapps").mkdir(parents=True)
 
         assert discovery.discover(home=tmp_path) == []
+
+    def test_ohne_bestimmbares_home_nur_manuelle_pfade(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Ohne Home entfaellt die automatische Suche, uebergebene Pfade
+        # muessen aber weiterhin gefunden werden.
+        manual = make_save_dir(tmp_path / "76561198000000009")
+        monkeypatch.setattr(discovery, "user_home", lambda: None)
+
+        locations = discovery.discover(extra_paths=(manual,))
+
+        assert [loc.path.resolve() for loc in locations] == [manual.resolve()]
+
+    def test_ohne_home_und_ohne_pfade_leer(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(discovery, "user_home", lambda: None)
+
+        assert discovery.discover() == []

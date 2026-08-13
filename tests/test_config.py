@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from r2wa.config import Settings, config_dir  # noqa: E402
+from r2wa.config import Settings, config_dir, user_home  # noqa: E402
 
 
 class TestSettings:
@@ -76,7 +76,67 @@ class TestConfigDir:
 
         assert config_dir() == tmp_path / "r2wa"
 
-    def test_faellt_auf_punkt_config_zurueck(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_faellt_auf_punkt_config_zurueck(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
 
-        assert config_dir() == Path.home() / ".config" / "r2wa"
+        assert config_dir() == tmp_path / ".config" / "r2wa"
+
+    def test_ohne_home_kein_verzeichnis(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Ohne bestimmbares Home gibt es keinen Speicherort - das darf keine
+        # Ausnahme werfen, sondern muss None liefern.
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.delenv("HOME", raising=False)
+        monkeypatch.delenv("USERPROFILE", raising=False)
+        monkeypatch.setattr(Path, "home", _raise_runtime_error)
+
+        assert config_dir() is None
+
+
+class TestUserHome:
+    def test_bevorzugt_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+
+        assert user_home() == tmp_path
+
+    def test_faellt_auf_userprofile_zurueck(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("HOME", raising=False)
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+        assert user_home() == tmp_path
+
+    def test_ohne_alles_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("HOME", raising=False)
+        monkeypatch.delenv("USERPROFILE", raising=False)
+        monkeypatch.setattr(Path, "home", _raise_runtime_error)
+
+        assert user_home() is None
+
+
+class TestEinstellungenOhneHome:
+    """Ohne Speicherort muss die Anwendung trotzdem starten koennen."""
+
+    def test_laden_liefert_voreinstellung(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _remove_home(monkeypatch)
+
+        assert Settings.load().save_dir is None
+
+    def test_speichern_wirft_nicht(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _remove_home(monkeypatch)
+
+        Settings(save_dir="/irgendwo").save()
+
+
+def _raise_runtime_error(*_args, **_kwargs):
+    raise RuntimeError("Could not determine home directory.")
+
+
+def _remove_home(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.delenv("HOME", raising=False)
+    monkeypatch.delenv("USERPROFILE", raising=False)
+    monkeypatch.setattr(Path, "home", _raise_runtime_error)

@@ -94,7 +94,14 @@ cross-publishbar; die GTK-Oberfläche braucht Linux.
 just test     # pytest
 just lint     # ruff
 just check    # beides
+just smoke    # Oberflaeche wirklich aufbauen und pruefen
 ```
+
+`just smoke` baut die Ansichten auf, hängt sie in ein Fenster, lässt den
+Main-Loop laufen und prüft Filter, Suche, Aufklappen und Charakterwechsel.
+Das braucht PyGObject und eine Anzeige und läuft deshalb nicht unter
+`just test`. Mit `--show` bleibt das Fenster zum Ansehen offen, mit
+`--save-dir` läuft es gegen ein echtes Savegame statt gegen das Fixture.
 
 Die Datenschicht (`models.py`, `parser_bridge.py`, `discovery.py`) kommt ohne
 PyGObject aus und ist deshalb auf jeder Plattform testbar. Für den

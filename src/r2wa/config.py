@@ -16,11 +16,36 @@ from pathlib import Path
 CONFIG_FILE = "settings.json"
 
 
-def config_dir() -> Path:
-    """Verzeichnis nach XDG-Konvention, ohne Abhaengigkeit von GLib."""
+def user_home() -> Path | None:
+    """Home-Verzeichnis, oder ``None`` wenn es sich nicht bestimmen laesst.
+
+    ``Path.home()`` wirft eine RuntimeError, wenn weder HOME noch USERPROFILE
+    gesetzt sind. Das kommt auf einem Desktop praktisch nicht vor, wohl aber
+    in abgemagerten Umgebungen - und darf die Anwendung nicht am Start
+    hindern.
+    """
+    for variable in ("HOME", "USERPROFILE"):
+        value = os.environ.get(variable)
+        if value:
+            return Path(value)
+    try:
+        return Path.home()
+    except RuntimeError:
+        return None
+
+
+def config_dir() -> Path | None:
+    """Verzeichnis nach XDG-Konvention, ohne Abhaengigkeit von GLib.
+
+    ``None`` bedeutet: es gibt keinen Ort zum Speichern. Die Anwendung laeuft
+    dann ohne gemerkte Einstellungen weiter.
+    """
     base = os.environ.get("XDG_CONFIG_HOME")
-    root = Path(base) if base else Path.home() / ".config"
-    return root / "r2wa"
+    if base:
+        return Path(base) / "r2wa"
+
+    home = user_home()
+    return home / ".config" / "r2wa" if home else None
 
 
 @dataclass(slots=True)
@@ -36,7 +61,10 @@ class Settings:
     @classmethod
     def load(cls, path: Path | None = None) -> Settings:
         """Lies die Einstellungen; fehlerhafte Dateien werden ignoriert."""
-        target = path or (config_dir() / CONFIG_FILE)
+        target = path or _default_path()
+        if target is None:
+            return cls()
+
         try:
             data = json.loads(target.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -58,7 +86,10 @@ class Settings:
         Ein Fehlschlag ist kein Grund abzubrechen - im schlimmsten Fall muss
         der Ordner beim naechsten Start erneut gewaehlt werden.
         """
-        target = path or (config_dir() / CONFIG_FILE)
+        target = path or _default_path()
+        if target is None:
+            return
+
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             payload = {"save_dir": self.save_dir, "character_index": self.character_index}
@@ -69,3 +100,8 @@ class Settings:
             temporary.replace(target)
         except OSError:
             pass
+
+
+def _default_path() -> Path | None:
+    directory = config_dir()
+    return directory / CONFIG_FILE if directory else None

@@ -233,8 +233,11 @@ class Window(Adw.ApplicationWindow):
                 "oder setze R2WA_PARSER auf den Pfad des Binaries."
             )
         else:
-            # Fehlertexte enthalten Pfade und Meldungen des Parsers;
-            # Adw.StatusPage rendert die Beschreibung als Markup.
+            # Fehlertexte enthalten Pfade und Meldungen des Parsers. Bei
+            # Adw.StatusPage rendert die Beschreibung als Pango-Markup, der
+            # Titel dagegen nicht - ein "&" im Text bricht sonst die Anzeige.
+            # Gleiches gilt fuer Adw.ActionRow (beide Felder Markup);
+            # Adw.Banner nimmt seinen Titel wiederum wortwoertlich.
             description = GLib.markup_escape_text(str(error))
 
         self._show_placeholder("Analyse fehlgeschlagen", description)

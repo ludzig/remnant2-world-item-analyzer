@@ -42,6 +42,11 @@ analyze dir:
 test:
     python3 -m pytest -q
 
+# Smoke-Test der Oberflaeche: baut die Ansichten wirklich auf und prueft sie.
+# Braucht PyGObject und eine Anzeige, laeuft deshalb nicht unter `just test`.
+smoke *args:
+    PYTHONPATH=src python3 tests/smoke_ui.py {{args}}
+
 lint:
     python3 -m ruff check src tests
     python3 -m ruff format --check src tests
