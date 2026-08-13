@@ -39,20 +39,39 @@ Anpassung auf `parser/DatasetMapper.cs` beschränkt.
 - .NET SDK 10 zum Bauen des Parsers
 - [just](https://github.com/casey/just) für die Buildaufgaben (optional)
 
-## Loslegen
+## Erster Start auf der Linux-Maschine
 
 ```bash
-just build-parser     # baut build/parser/r2wa-parser für linux-x64
-just run              # startet die Anwendung
+just build-parser && just smoke && just run
 ```
+
+Die drei Schritte bauen den Parser für `linux-x64`, prüfen die Oberfläche
+(18 Selbsttests über Filter, Suche, Baum und Charakterwechsel) und starten
+dann die Anwendung. Geht `just smoke` durch, funktioniert die GTK-Schicht;
+scheitert `just run` danach trotzdem, liegt es an der Savegame-Suche.
 
 Ohne `just`:
 
 ```bash
 dotnet publish parser/R2waParser.csproj -c Release -r linux-x64 \
     --self-contained -p:PublishSingleFile=true -o build/parser
+PYTHONPATH=src python3 tests/smoke_ui.py
 PYTHONPATH=src python3 -m r2wa.main
 ```
+
+### Ordner von Windows übertragen
+
+Das Arbeitsverzeichnis lässt sich direkt kopieren, alle Dateien haben
+LF-Zeilenenden. Nicht mitnehmen — beziehungsweise vorher `just clean`:
+
+| Verzeichnis | warum |
+|---|---|
+| `build/`, `parser/bin/`, `parser/obj/` | enthalten das Windows-Binary, wird neu gebaut |
+| `.venv/` | Windows-Interpreter, unter Linux unbrauchbar |
+| `__pycache__/` | plattformabhängig |
+
+PyGObject kommt unter GNOME aus der Distribution und gehört **nicht** in ein
+venv — die Anwendung läuft direkt mit dem System-Python.
 
 Das Savegame wird automatisch gesucht. Ein abweichender Pfad lässt sich als
 Argument übergeben oder im Fenster über *Ordner öffnen…* wählen:
@@ -129,6 +148,16 @@ build/parser/r2wa-parser version
 
 Auf stdout liegt ausschließlich JSON. Im Fehlerfall ein
 `{"error":{"kind":…,"message":…}}` mit Exit-Code 1.
+
+## Ausblick
+
+Als Nächstes sollen die Items mit **Bildern** dargestellt werden. Die Zuordnung
+kommt aus einer XML-Datei, die noch beizusteuern ist. Anzuknüpfen wäre sie an
+`CatalogItem.id` in [models.py](src/r2wa/models.py) — die Kennung ist über den
+ganzen Katalog eindeutig und stammt direkt aus `db.json`, taugt also als
+stabiler Schlüssel. In der Liste würde das Bild an die Stelle des
+Häkchen-Symbols in `_setup_row` von [views/items.py](src/r2wa/views/items.py)
+treten, der Fundstatus dann über einen Rahmen oder ein Overlay.
 
 ## Lizenz
 
