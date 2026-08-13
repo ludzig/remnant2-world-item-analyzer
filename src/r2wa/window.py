@@ -11,6 +11,7 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gio, GLib, Gtk, Pango  # noqa: E402
 
+from .config import Settings  # noqa: E402
 from .discovery import SaveLocation, discover  # noqa: E402
 from .models import Analysis, Character, format_playtime  # noqa: E402
 from .parser_bridge import ParserError, analyze_async  # noqa: E402
@@ -33,7 +34,10 @@ class Window(Adw.ApplicationWindow):
 
         self._analysis: Analysis | None = None
         self._location: SaveLocation | None = None
-        self._explicit_save_dir = save_dir
+        self._settings = Settings.load()
+        # Ein Pfad von der Kommandozeile gilt nur fuer diesen Start und wird
+        # nicht gespeichert; die gemerkte Wahl bleibt davon unberuehrt.
+        self._explicit_save_dir = save_dir or self._settings.save_dir
         self._monitor: Gio.FileMonitor | None = None
         self._reload_source: int | None = None
         self._loading = False
@@ -251,8 +255,18 @@ class Window(Adw.ApplicationWindow):
         for character in analysis.characters:
             self._character_list.append(_CharacterRow(character, analysis))
 
-        target = previous if previous is not None else analysis.active_character_index
-        row = self._row_for_index(target) or self._character_list.get_row_at_index(0)
+        # Beim erneuten Einlesen bleibt die Auswahl stehen; beim ersten Start
+        # zaehlt der zuletzt betrachtete Charakter, sonst der im Spiel aktive.
+        row = None
+        for candidate in (
+            previous,
+            self._settings.character_index,
+            analysis.active_character_index,
+        ):
+            if candidate is not None and (row := self._row_for_index(candidate)) is not None:
+                break
+
+        row = row or self._character_list.get_row_at_index(0)
         if row is not None:
             self._character_list.select_row(row)
         else:
@@ -271,7 +285,10 @@ class Window(Adw.ApplicationWindow):
         return None
 
     def _on_character_selected(self, _list: Gtk.ListBox, row: Gtk.ListBoxRow | None) -> None:
-        self._show_character(row.character if isinstance(row, _CharacterRow) else None)
+        character = row.character if isinstance(row, _CharacterRow) else None
+        if character is not None:
+            self._settings.character_index = character.index
+        self._show_character(character)
 
     def _show_character(self, character: Character | None) -> None:
         self._items_view.set_analysis(self._analysis, character)
@@ -294,6 +311,8 @@ class Window(Adw.ApplicationWindow):
                 return
 
             self._explicit_save_dir = folder.get_path()
+            self._settings.save_dir = self._explicit_save_dir
+            self._settings.save()
             self.load()
 
         dialog.select_folder(self, None, chosen)
@@ -352,6 +371,7 @@ class Window(Adw.ApplicationWindow):
         if self._monitor is not None:
             self._monitor.cancel()
             self._monitor = None
+        self._settings.save()
         return False
 
 
