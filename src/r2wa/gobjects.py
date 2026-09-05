@@ -1,24 +1,26 @@
-"""GObject-Huellen um das Datenmodell.
+"""GObject wrappers around the data model.
 
-Gtk.ListView arbeitet ausschliesslich mit GObject-Instanzen. Diese Klassen
-halten nur eine Referenz auf die Dataclasses aus :mod:`r2wa.models` und
-bringen keine eigene Logik mit - so bleibt die Auswertung dort testbar,
-ohne dass GTK geladen werden muss.
+Gtk.ListView works exclusively with GObject instances. These classes only
+hold a reference to the dataclasses from :mod:`r2wa.models` and carry no
+logic of their own - that way the evaluation stays testable there without
+GTK having to be loaded.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import gi
 
 gi.require_version("Gtk", "4.0")
 
-from gi.repository import Gio, GObject  # noqa: E402
+from gi.repository import GObject  # noqa: E402
 
-from .models import Character, Item, Location, LootGroup, LootItem, World, Zone  # noqa: E402
+from .models import Character, Item, Location, LootItem, Zone  # noqa: E402
 
 
 class ItemObject(GObject.Object):
-    """Ein Sammelobjekt in der Item-Liste."""
+    """A collectible item in the item list."""
 
     __gtype_name__ = "R2waItemObject"
 
@@ -40,7 +42,7 @@ class ItemObject(GObject.Object):
 
 
 class CharacterObject(GObject.Object):
-    """Ein Charakter in der Seitenleiste."""
+    """A character in the sidebar."""
 
     __gtype_name__ = "R2waCharacterObject"
 
@@ -49,120 +51,58 @@ class CharacterObject(GObject.Object):
         self.character = character
 
 
-class TreeNode(GObject.Object):
-    """Ein Knoten im Weltenbaum.
+class ZoneObject(GObject.Object):
+    """A zone (biome) of a rolled world, shown in the worlds view's first column."""
 
-    Der Baum ist flach modelliert: jeder Knoten kennt seine Kinder als Liste
-    von Rohobjekten und erzeugt sie erst, wenn Gtk.TreeListModel danach fragt.
+    __gtype_name__ = "R2waZoneObject"
+
+    def __init__(self, zone: Zone):
+        super().__init__()
+        self.zone = zone
+
+
+class LocationObject(GObject.Object):
+    """A location within a zone, shown in the worlds view's second column."""
+
+    __gtype_name__ = "R2waLocationObject"
+
+    def __init__(self, location: Location):
+        super().__init__()
+        self.location = location
+
+
+class LootItemObject(GObject.Object):
+    """An item found at a location, shown in the worlds view's third column.
+
+    ``group_index``/``group_label`` carry the loot group the item came from
+    (e.g. a vendor's name, or an event trigger) so the item list can still
+    section itself by group after flattening the location's loot groups.
+    ``group_icon_path``/``group_wiki_url`` belong to that heading - only
+    vendors and bosses have them, the wiki keeps no page or portrait for a
+    "World Drop".
     """
 
-    __gtype_name__ = "R2waTreeNode"
+    __gtype_name__ = "R2waLootItemObject"
 
     def __init__(
         self,
-        title: str,
-        subtitle: str = "",
-        icon: str | None = None,
-        badge: str = "",
-        payload: object = None,
-        children: tuple[TreeNode, ...] = (),
-        dim: bool = False,
+        item: LootItem,
+        group_index: int,
+        group_label: str,
+        group_type: str,
+        icon_path: Path | None = None,
+        wiki_url: str | None = None,
+        group_icon_path: Path | None = None,
+        group_wiki_url: str | None = None,
+        note: str | None = None,
     ):
         super().__init__()
-        self.title = title
-        self.subtitle = subtitle
-        self.icon = icon
-        self.badge = badge
-        self.payload = payload
-        self.children = children
-        #: Abgeschlossenes oder eingesammeltes wird gedaempft dargestellt.
-        self.dim = dim
-
-    @property
-    def expandable(self) -> bool:
-        return bool(self.children)
-
-    def child_model(self) -> Gio.ListStore | None:
-        """Kindknoten als ListStore - Rueckgabewert fuer Gtk.TreeListModel."""
-        if not self.children:
-            return None
-        store = Gio.ListStore.new(TreeNode)
-        for child in self.children:
-            store.append(child)
-        return store
-
-
-def build_world_nodes(world: World) -> tuple[TreeNode, ...]:
-    """Baue den Knotenbaum einer gerollten Welt: Zone -> Ort -> Fundstelle."""
-    return tuple(_zone_node(zone) for zone in world.zones)
-
-
-def _zone_node(zone: Zone) -> TreeNode:
-    open_items = zone.open_item_count
-    details = [zone.story] if zone.story else []
-    if zone.finished:
-        details.append("abgeschlossen")
-
-    return TreeNode(
-        title=zone.name,
-        subtitle=" · ".join(details),
-        icon="map-symbolic",
-        badge=str(open_items) if open_items else "",
-        payload=zone,
-        children=tuple(_location_node(loc) for loc in zone.locations),
-        dim=zone.finished and not open_items,
-    )
-
-
-def _location_node(location: Location) -> TreeNode:
-    marks: list[str] = []
-    if location.trait_book and not location.trait_book_looted:
-        marks.append("Eigenschaftsbuch")
-    if location.simulacrum and not location.simulacrum_looted:
-        marks.append("Simulacrum")
-    if location.bloodmoon:
-        marks.append("Blutmond")
-    if location.vendors:
-        marks.append("Händler: " + ", ".join(location.vendors))
-
-    open_items = location.open_item_count
-    return TreeNode(
-        title=location.name,
-        subtitle=" · ".join(marks) if marks else (location.category or ""),
-        icon="mark-location-symbolic",
-        badge=str(open_items) if open_items else "",
-        payload=location,
-        children=tuple(_group_node(group) for group in location.loot_groups),
-        dim=not open_items,
-    )
-
-
-def _group_node(group: LootGroup) -> TreeNode:
-    return TreeNode(
-        title=group.label,
-        subtitle=group.type or "",
-        icon="package-x-generic-symbolic",
-        payload=group,
-        children=tuple(_loot_node(item) for item in group.items),
-        dim=all(item.is_looted for item in group.items) if group.items else False,
-    )
-
-
-def _loot_node(item: LootItem) -> TreeNode:
-    notes: list[str] = []
-    if item.subcategory:
-        notes.append(item.subcategory)
-    if item.coop_only:
-        notes.append("nur im Koop")
-    if item.is_prerequisite_missing:
-        notes.append("Voraussetzung fehlt")
-    if not item.has_required_material and item.category == "mod":
-        notes.append("Material fehlt")
-
-    return TreeNode(
-        title=item.name,
-        subtitle=" · ".join(notes),
-        icon="emblem-ok-symbolic" if item.is_looted else "list-add-symbolic",
-        payload=item,
-        dim=item.is_looted,
-    )
+        self.item = item
+        self.group_index = group_index
+        self.group_label = group_label
+        self.group_type = group_type
+        self.icon_path = icon_path
+        self.wiki_url = wiki_url
+        self.group_icon_path = group_icon_path
+        self.group_wiki_url = group_wiki_url
+        self.note = note
