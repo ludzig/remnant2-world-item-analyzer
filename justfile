@@ -1,8 +1,8 @@
-# r2wa - Build- und Entwicklungsaufgaben
+# r2wa - build and development tasks
 #
-# Entwickelt wird auf Windows, gebaut und ausgefuehrt auf Linux.
-# `just sync` spiegelt das Arbeitsverzeichnis auf die Testmaschine;
-# Ziel ueber die Umgebungsvariable R2WA_REMOTE setzen, z.B.
+# Developed on Windows, built and run on Linux.
+# `just sync` mirrors the working directory to the test machine;
+# set the target via the R2WA_REMOTE environment variable, e.g.
 #   export R2WA_REMOTE=user@steamdeck:~/dev/r2wa
 
 remote := env_var_or_default("R2WA_REMOTE", "")
@@ -14,36 +14,40 @@ default:
 
 # --- Parser (C#) ----------------------------------------------------------
 
-# Baue den Parser fuer Linux als eigenstaendiges Binary (auch von Windows aus).
-build-parser:
+# Build the parser for Linux (also from Windows) and fetch item icons while at it.
+build-parser: fetch-icons
     dotnet publish parser/R2waParser.csproj -c Release -r linux-x64 \
         --self-contained -p:PublishSingleFile=true -o {{parser_out}}
 
-# Baue den Parser fuer den lokalen Rechner - fuer Tests auf dem Windows-Host.
+# Build the parser for the local machine - for tests on the Windows host.
 build-parser-host:
     dotnet publish parser/R2waParser.csproj -c Release -o {{parser_out}}
 
-# --- Python-App -----------------------------------------------------------
+# --- Python app -------------------------------------------------------------
 
-# Starte die Anwendung aus dem Arbeitsverzeichnis.
+# Start the application from the working directory.
 run *args:
     PYTHONPATH=src python3 -m r2wa.main {{args}}
 
-# Zeige die gefundenen Savegame-Verzeichnisse.
+# Show the save game directories found.
 discover:
     PYTHONPATH=src python3 -m r2wa.discovery
 
-# Analysiere ein Savegame direkt ueber den Parser und gib das JSON aus.
+# Analyze a save game directly through the parser and print the JSON.
 analyze dir:
     {{parser_bin}} analyze --save-dir "{{dir}}" --pretty
 
-# --- Qualitaet ------------------------------------------------------------
+# Download all item icons and vendor/boss portraits from the Remnant wiki once (cached in build/icons, skips what's already there).
+fetch-icons:
+    PYTHONPATH=src python3 -m r2wa.icon_fetch
+
+# --- Quality ----------------------------------------------------------------
 
 test:
     python3 -m pytest -q
 
-# Smoke-Test der Oberflaeche: baut die Ansichten wirklich auf und prueft sie.
-# Braucht PyGObject und eine Anzeige, laeuft deshalb nicht unter `just test`.
+# Smoke test of the UI: actually builds the views and checks them.
+# Needs PyGObject and a display, so it doesn't run under `just test`.
 smoke *args:
     PYTHONPATH=src python3 tests/smoke_ui.py {{args}}
 
@@ -57,21 +61,21 @@ fmt:
 
 check: lint test
 
-# --- Fixtures -------------------------------------------------------------
+# --- Fixtures ---------------------------------------------------------------
 
-# Erzeuge die erwartete JSON-Ausgabe fuer die Save-Fixtures neu.
-# Nur aufrufen, wenn die Abweichung geprueft und gewollt ist.
+# Regenerate the expected JSON output for the save fixtures.
+# Only run this once the difference has been reviewed and is intentional.
 bless:
     PYTHONPATH=src python3 tests/bless_fixtures.py {{parser_bin}}
 
-# --- Sync -----------------------------------------------------------------
+# --- Sync ---------------------------------------------------------------
 
-# Spiegle das Arbeitsverzeichnis auf die Linux-Testmaschine.
+# Mirror the working directory to the Linux test machine.
 sync:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ -z "{{remote}}" ]; then
-        echo "R2WA_REMOTE ist nicht gesetzt, z.B. user@host:~/dev/r2wa" >&2
+        echo "R2WA_REMOTE is not set, e.g. user@host:~/dev/r2wa" >&2
         exit 1
     fi
     rsync -av --delete \
