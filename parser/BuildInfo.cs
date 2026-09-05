@@ -4,7 +4,7 @@ using R2wa.Parser.Contract;
 
 namespace R2wa.Parser;
 
-/// <summary>Versionsangaben, die in jede Ausgabe eingebettet werden.</summary>
+/// <summary>Version info embedded in every output.</summary>
 internal static class BuildInfo
 {
     public static GeneratorInfo Generator { get; } = new()

@@ -1,1 +1,1 @@
-"""Die Ansichten des Hauptfensters."""
+"""The views of the main window."""

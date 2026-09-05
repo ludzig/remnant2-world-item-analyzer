@@ -1,4 +1,4 @@
-"""Tests der Save-Discovery gegen nachgebaute Verzeichnisbaeume."""
+"""Tests of the save discovery against rebuilt directory trees."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from r2wa.discovery import GAME_APP_ID, SAVE_SUBPATH  # noqa: E402
 
 
 def make_save_dir(base: Path, slots: int = 2, profile: bool = True) -> Path:
-    """Lege ein Savegame-Verzeichnis mit *slots* Charakteren an."""
+    """Create a save game directory with *slots* characters."""
     base.mkdir(parents=True, exist_ok=True)
     if profile:
         (base / "profile.sav").write_bytes(b"\x00")
@@ -24,7 +24,7 @@ def make_save_dir(base: Path, slots: int = 2, profile: bool = True) -> Path:
 
 
 def make_proton_tree(root: Path, steam_id: str = "76561198000000001", slots: int = 2) -> Path:
-    """Baue einen vollstaendigen Steam-/Proton-Baum unterhalb von *root*."""
+    """Build a complete Steam/Proton tree below *root*."""
     (root / "steamapps").mkdir(parents=True, exist_ok=True)
     save_dir = root.joinpath("steamapps", "compatdata", GAME_APP_ID, *SAVE_SUBPATH, steam_id)
     return make_save_dir(save_dir, slots=slots)
@@ -216,7 +216,7 @@ class TestDiscover:
     def test_ohne_treffer_leer(self, tmp_path: Path) -> None:
         assert discovery.discover(home=tmp_path) == []
 
-    @pytest.mark.skipif(sys.platform == "win32", reason="Windows-Zweig liefert Zusatztreffer")
+    @pytest.mark.skipif(sys.platform == "win32", reason="the Windows branch yields extra hits")
     def test_leeres_home_findet_nichts(self, tmp_path: Path) -> None:
         (tmp_path / ".steam" / "steam" / "steamapps").mkdir(parents=True)
 
@@ -225,8 +225,8 @@ class TestDiscover:
     def test_ohne_bestimmbares_home_nur_manuelle_pfade(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # Ohne Home entfaellt die automatische Suche, uebergebene Pfade
-        # muessen aber weiterhin gefunden werden.
+        # Without a home, the automatic search is skipped, but paths passed
+        # in explicitly must still be found.
         manual = make_save_dir(tmp_path / "76561198000000009")
         monkeypatch.setattr(discovery, "user_home", lambda: None)
 

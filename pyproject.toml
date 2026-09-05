@@ -1,12 +1,12 @@
 [project]
 name = "r2wa"
 version = "0.1.0"
-description = "Remnant 2 World & Item Analyzer fuer GNOME"
+description = "Remnant 2 World & Item Analyzer for GNOME"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-# PyGObject wird bewusst nicht als Dependency gefuehrt: unter GNOME kommt es
-# aus der Distribution (python3-gi), ein pip-Build braucht die kompletten
-# GTK-Header und schlaegt auf dem Windows-Entwicklungsrechner ohnehin fehl.
+# PyGObject is deliberately not listed as a dependency: on GNOME it comes
+# from the distribution (python3-gi), and a pip build needs the full GTK
+# headers and would fail on the Windows development machine anyway.
 dependencies = []
 
 [project.optional-dependencies]

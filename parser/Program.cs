@@ -5,11 +5,11 @@ using lib.remnant2.analyzer.Model;
 using R2wa.Parser;
 using R2wa.Parser.Contract;
 
-// r2wa-parser - Bruecke zwischen der Analyzer-Bibliothek und der GTK-Anwendung.
+// r2wa-parser - bridge between the analyzer library and the GTK application.
 //
-// Auf stdout liegt ausschliesslich JSON, damit die aufrufende Seite es ohne
-// Vorfilterung parsen kann. Alles andere - Logs der Bibliothek, Diagnose,
-// Hilfetext - geht nach stderr.
+// stdout carries nothing but JSON, so the calling side can parse it without
+// pre-filtering. Everything else - library logs, diagnostics, help text -
+// goes to stderr.
 
 Console.OutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
@@ -19,7 +19,7 @@ try
 }
 catch (Exception ex)
 {
-    return Fail("unexpected_error", "Unerwarteter Fehler in der Analyse.", ex.ToString());
+    return Fail("unexpected_error", "Unexpected error during analysis.", ex.ToString());
 }
 
 static int Run(string[] args)
@@ -37,7 +37,7 @@ static int Run(string[] args)
         "version" => Emit(new VersionResult { Generator = BuildInfo.Generator }, pretty),
         "catalog" => Emit(DatasetMapper.BuildCatalog(), pretty),
         "analyze" => Analyze(args, pretty),
-        _ => Fail("unknown_command", $"Unbekannter Befehl '{args[0]}'."),
+        _ => Fail("unknown_command", $"Unknown command '{args[0]}'."),
     };
 }
 
@@ -45,15 +45,15 @@ static int Analyze(string[] args, bool pretty)
 {
     var saveDir = GetOption(args, "--save-dir");
     if (string.IsNullOrWhiteSpace(saveDir))
-        return Fail("missing_argument", "--save-dir fehlt.");
+        return Fail("missing_argument", "--save-dir is missing.");
 
     saveDir = Path.GetFullPath(saveDir);
 
     if (!Directory.Exists(saveDir))
-        return Fail("save_dir_not_found", $"Verzeichnis nicht gefunden: {saveDir}");
+        return Fail("save_dir_not_found", $"Directory not found: {saveDir}");
 
     if (!File.Exists(Path.Combine(saveDir, "profile.sav")))
-        return Fail("profile_not_found", $"Keine profile.sav in {saveDir}");
+        return Fail("profile_not_found", $"No profile.sav in {saveDir}");
 
     Dataset dataset;
     try
@@ -63,7 +63,7 @@ static int Analyze(string[] args, bool pretty)
     catch (Exception ex)
     {
         return Fail("analysis_failed",
-            $"Savegame konnte nicht gelesen werden: {ex.Message}", ex.ToString());
+            $"Could not read save game: {ex.Message}", ex.ToString());
     }
 
     return Emit(DatasetMapper.Map(dataset, saveDir), pretty);
@@ -101,13 +101,13 @@ static string? GetOption(string[] args, string name)
 static void Usage()
 {
     Console.Error.WriteLine("""
-        r2wa-parser - liest Remnant-2-Savegames und gibt JSON auf stdout aus.
+        r2wa-parser - reads Remnant 2 save games and prints JSON on stdout.
 
-          analyze --save-dir <pfad> [--pretty]   Savegame-Verzeichnis analysieren
-          catalog [--pretty]                     Item-Katalog aus db.json, ohne Savegame
-          version [--pretty]                     Schema- und Bibliotheksversion
+          analyze --save-dir <path> [--pretty]   analyze a save game directory
+          catalog [--pretty]                     item catalog from db.json, no save game needed
+          version [--pretty]                     schema and library version
 
-        Exit-Code 0 bei Erfolg, sonst 1; im Fehlerfall steht ein
-        {"error":{...}}-Objekt auf stdout.
+        Exit code 0 on success, otherwise 1; on failure an
+        {"error":{...}} object is printed on stdout.
         """);
 }

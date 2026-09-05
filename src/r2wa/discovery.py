@@ -1,12 +1,12 @@
-"""Auffinden der Remnant-2-Savegame-Verzeichnisse.
+"""Discovering the Remnant 2 save game directories.
 
-Unter Linux liegen die Saves im Proton-Prefix des Spiels. Der Pfad dorthin
-variiert nach Steam-Installationsart (nativ, Flatpak) und Library-Ordner, die
-Steam-ID im letzten Segment ist ohnehin pro Account verschieden. Dieses Modul
-sammelt daher alle plausiblen Kandidaten ein und validiert sie.
+On Linux the saves live inside the game's Proton prefix. The path there
+varies with the Steam installation type (native, Flatpak) and library
+folder, and the Steam ID in the last segment differs per account anyway.
+This module therefore collects all plausible candidates and validates them.
 
-Alle Funktionen nehmen die zu durchsuchenden Wurzeln als Parameter entgegen,
-damit die Suche in Tests gegen einen nachgebauten Verzeichnisbaum laufen kann.
+All functions take the roots to search as parameters, so the search can run
+against a rebuilt directory tree in tests.
 """
 
 from __future__ import annotations
@@ -19,19 +19,19 @@ from pathlib import Path
 
 from .config import user_home
 
-#: Steam-App-ID von Remnant II - benennt den compatdata-Ordner des Prefix.
+#: Steam app ID of Remnant II - names the compatdata folder of the prefix.
 GAME_APP_ID = "1282100"
 
-#: Pfad vom compatdata-Ordner des Spiels bis zum Verzeichnis der Steam-Accounts.
+#: Path from the compatdata folder of the game to the directory of Steam accounts.
 SAVE_SUBPATH = ("pfx", "drive_c", "users", "steamuser", "Saved Games", "Remnant2", "Steam")
 
-#: Pfad ab dem Windows-Benutzerprofil - fuer Entwicklung/Test auf Windows.
+#: Path from the Windows user profile - for development/testing on Windows.
 WINDOWS_SUBPATH = ("Saved Games", "Remnant2", "Steam")
 
 PROFILE_FILE = "profile.sav"
 SLOT_PATTERN = re.compile(r"^save_(\d+)\.sav$", re.IGNORECASE)
 
-#: Steam-Wurzeln relativ zum Home-Verzeichnis, in Reihenfolge der Ueblichkeit.
+#: Steam roots relative to the home directory, in order of likelihood.
 _STEAM_ROOT_CANDIDATES = (
     ".steam/steam",
     ".steam/root",
@@ -40,21 +40,21 @@ _STEAM_ROOT_CANDIDATES = (
     ".var/app/com.valvesoftware.Steam/.local/share/Steam",
 )
 
-#: In libraryfolders.vdf steht je Library eine "path"-Zeile.
+#: libraryfolders.vdf has one "path" line per library.
 _VDF_PATH = re.compile(r'"path"\s+"([^"]+)"')
 
 
 @dataclass(frozen=True, slots=True)
 class SaveLocation:
-    """Ein validiertes Savegame-Verzeichnis eines Steam-Accounts."""
+    """A validated save game directory of a Steam account."""
 
     path: Path
     steam_id: str
     source: str
-    """Woher der Fund stammt: ``proton``, ``windows`` oder ``manual``."""
+    """Where the find came from: ``proton``, ``windows`` or ``manual``."""
     profile: Path
     slots: tuple[Path, ...]
-    """Die ``save_N.sav``-Dateien, aufsteigend nach Slot-Nummer."""
+    """The ``save_N.sav`` files, sorted ascending by slot number."""
 
     @property
     def slot_count(self) -> int:
@@ -62,23 +62,22 @@ class SaveLocation:
 
     @property
     def modified(self) -> float:
-        """Aenderungszeit der Profildatei - dient als Sortierkriterium."""
+        """Modification time of the profile file - used as the sort key."""
         try:
             return self.profile.stat().st_mtime
         except OSError:
             return 0.0
 
     def __str__(self) -> str:
-        return f"{self.path} ({self.slot_count} Slots, {self.source})"
+        return f"{self.path} ({self.slot_count} slots, {self.source})"
 
 
 def validate(path: Path, source: str = "manual") -> SaveLocation | None:
-    """Pruefe, ob *path* ein Savegame-Verzeichnis ist.
+    """Check whether *path* is a save game directory.
 
-    Gefordert sind eine ``profile.sav`` und mindestens ein ``save_N.sav``.
-    Ein Verzeichnis ohne Slots gehoert zu einem Account, der das Spiel zwar
-    gestartet, aber nie einen Charakter angelegt hat - fuer die Analyse
-    wertlos, deshalb kein Treffer.
+    Requires a ``profile.sav`` and at least one ``save_N.sav``. A directory
+    without slots belongs to an account that has started the game but never
+    created a character - useless for the analysis, so not a match.
     """
     if not path.is_dir():
         return None
@@ -112,7 +111,7 @@ def validate(path: Path, source: str = "manual") -> SaveLocation | None:
 
 
 def steam_roots(home: Path) -> list[Path]:
-    """Liefere die existierenden Steam-Installationswurzeln unter *home*."""
+    """Return the existing Steam installation roots under *home*."""
     roots: list[Path] = []
     for candidate in _STEAM_ROOT_CANDIDATES:
         root = home / candidate
@@ -122,12 +121,12 @@ def steam_roots(home: Path) -> list[Path]:
 
 
 def library_folders(root: Path) -> list[Path]:
-    """Lies zusaetzliche Steam-Library-Ordner aus ``libraryfolders.vdf``.
+    """Read additional Steam library folders from ``libraryfolders.vdf``.
 
-    Der Rueckgabewert enthaelt *root* selbst nicht; nur die dort eingetragenen
-    weiteren Bibliotheken. Ist die Datei nicht lesbar oder unerwartet
-    formatiert, wird das still als "keine weiteren Bibliotheken" behandelt -
-    die Discovery soll daran nicht scheitern.
+    The return value does not include *root* itself; only the further
+    libraries listed there. If the file is unreadable or unexpectedly
+    formatted, this is silently treated as "no further libraries" - the
+    discovery should not fail because of it.
     """
     vdf = root / "steamapps" / "libraryfolders.vdf"
     try:
@@ -140,7 +139,7 @@ def library_folders(root: Path) -> list[Path]:
 
 
 def compat_save_dirs(library: Path) -> list[Path]:
-    """Liefere die Account-Verzeichnisse im Proton-Prefix einer Library."""
+    """Return the account directories in the Proton prefix of a library."""
     base = library.joinpath("steamapps", "compatdata", GAME_APP_ID, *SAVE_SUBPATH)
     if not base.is_dir():
         return []
@@ -153,20 +152,20 @@ def compat_save_dirs(library: Path) -> list[Path]:
 def discover(
     home: Path | None = None,
     extra_paths: tuple[Path, ...] | list[Path] = (),
-) -> list[SaveLocation]:  # noqa: C901 - die Kandidatensuche ist bewusst linear
-    """Finde alle Savegame-Verzeichnisse.
+) -> list[SaveLocation]:  # noqa: C901 - the candidate search is deliberately linear
+    """Find all save game directories.
 
-    *extra_paths* sind manuell konfigurierte Verzeichnisse; sie werden zuerst
-    geprueft und erscheinen im Ergebnis vor den automatisch gefundenen.
-    Automatische Treffer sind nach Aenderungszeit der Profildatei sortiert,
-    der zuletzt bespielte Account steht also oben.
+    *extra_paths* are manually configured directories; they are checked
+    first and appear in the result before the automatically found ones.
+    Automatic hits are sorted by modification time of the profile file, so
+    the most recently played account is on top.
 
-    Mehrere Treffer werden bewusst alle zurueckgegeben statt still den ersten
-    zu waehlen - bei zwei Steam-Accounts auf einer Maschine waere die Auswahl
-    sonst geraten.
+    Multiple hits are deliberately all returned instead of silently picking
+    the first one - with two Steam accounts on one machine the choice would
+    otherwise be a guess.
 
-    Laesst sich das Home-Verzeichnis nicht bestimmen, entfaellt nur die
-    automatische Suche; uebergebene Pfade werden weiterhin geprueft.
+    If the home directory cannot be determined, only the automatic search is
+    skipped; paths passed in explicitly are still checked.
     """
     home = home or user_home()
     found: list[SaveLocation] = []
@@ -197,7 +196,7 @@ def discover(
 
 
 def _auto_candidates(home: Path) -> list[tuple[Path, str]]:
-    """Sammle alle zu pruefenden Verzeichnisse samt ihrer Herkunft."""
+    """Collect all directories to check, together with their origin."""
     candidates: list[tuple[Path, str]] = []
 
     libraries: list[Path] = []
@@ -209,9 +208,9 @@ def _auto_candidates(home: Path) -> list[tuple[Path, str]]:
         for save_dir in compat_save_dirs(library):
             candidates.append((save_dir, "proton"))
 
-    # Auf Windows liegt der gleiche Baum direkt im Benutzerprofil. Das ist fuer
-    # die Zielplattform irrelevant, macht aber die Discovery auf dem
-    # Entwicklungsrechner testbar.
+    # On Windows the same tree lives directly in the user profile. That is
+    # irrelevant for the target platform, but makes the discovery testable
+    # on the development machine.
     if sys.platform == "win32":
         windows_base = home.joinpath(*WINDOWS_SUBPATH)
         if windows_base.is_dir():
@@ -226,7 +225,7 @@ def _auto_candidates(home: Path) -> list[tuple[Path, str]]:
 
 
 def _dedupe(paths) -> list[Path]:
-    """Entferne Duplikate stabil, aufgeloest ueber Symlinks."""
+    """Remove duplicates stably, resolved through symlinks."""
     seen: set[Path] = set()
     result: list[Path] = []
     for path in paths:
@@ -241,11 +240,11 @@ def _dedupe(paths) -> list[Path]:
 
 
 def main() -> int:
-    """``python -m r2wa.discovery`` - zeigt die gefundenen Verzeichnisse."""
+    """``python -m r2wa.discovery`` - shows the directories found."""
     extra = [Path(p) for p in os.environ.get("R2WA_SAVE_DIR", "").split(os.pathsep) if p]
     locations = discover(extra_paths=tuple(extra))
     if not locations:
-        print("Kein Remnant-2-Savegame-Verzeichnis gefunden.", file=sys.stderr)
+        print("No Remnant 2 save game directory found.", file=sys.stderr)
         return 1
     for location in locations:
         print(location)

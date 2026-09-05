@@ -3,17 +3,17 @@ using System.Text.Json.Serialization;
 namespace R2wa.Parser.Contract;
 
 /// <summary>
-/// Wurzel des JSON-Vertrags zwischen Parser und GTK-Anwendung.
+/// Root of the JSON contract between the parser and the GTK application.
 /// </summary>
 /// <remarks>
-/// Dies ist bewusst <em>nicht</em> das Dataset der Analyzer-Bibliothek, sondern
-/// eine eigene, versionierte Sicht darauf. Aendert sich stromaufwaerts etwas,
-/// bleibt die Anpassung auf <see cref="DatasetMapper"/> beschraenkt und die
-/// Python-Seite merkt nichts davon.
+/// This is deliberately <em>not</em> the analyzer library's dataset, but its
+/// own, versioned view of it. If something changes upstream, the fix stays
+/// confined to <see cref="DatasetMapper"/> and the Python side notices
+/// nothing.
 /// </remarks>
 public sealed class AnalysisResult
 {
-    /// <summary>Muss zu SCHEMA_VERSION in src/r2wa/__init__.py passen.</summary>
+    /// <summary>Must match SCHEMA_VERSION in src/r2wa/__init__.py.</summary>
     public const int CurrentSchemaVersion = 1;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
@@ -23,19 +23,19 @@ public sealed class AnalysisResult
     public List<string> AccountAwards { get; init; } = [];
 
     /// <summary>
-    /// Die unveraenderlichen Stammdaten aller sammelbaren Items, einmalig.
-    /// Charaktere verweisen ueber <see cref="ItemStateDto.Id"/> hierauf, statt
-    /// die Metadaten je Charakter zu wiederholen - das spart beim Analysieren
-    /// von fuenf Slots ein Vielfaches an Nutzlast.
+    /// The immutable master data of every collectible item, listed once.
+    /// Characters reference it via <see cref="ItemStateDto.Id"/> instead of
+    /// repeating the metadata per character - that saves a multiple of the
+    /// payload when analyzing five slots.
     /// </summary>
     public List<CatalogItemDto> Catalog { get; init; } = [];
 
     public List<CharacterDto> Characters { get; init; } = [];
 
     /// <summary>
-    /// Nicht-fatale Probleme waehrend der Analyse, etwa einzelne Items, deren
-    /// Erreichbarkeit die Bibliothek nicht bestimmen konnte. Die Anwendung soll
-    /// das anzeigen koennen, ohne dass die Analyse als gescheitert gilt.
+    /// Non-fatal problems during the analysis, e.g. individual items whose
+    /// reachability the library could not determine. The application should
+    /// be able to display these without the analysis counting as failed.
     /// </summary>
     public List<string> Warnings { get; init; } = [];
 }
@@ -54,7 +54,7 @@ public sealed class ErrorResult
 
 public sealed class ErrorInfo
 {
-    /// <summary>Maschinenlesbare Fehlerklasse, z.B. <c>save_dir_not_found</c>.</summary>
+    /// <summary>Machine-readable error class, e.g. <c>save_dir_not_found</c>.</summary>
     public required string Kind { get; init; }
     public required string Message { get; init; }
     public string? Detail { get; init; }
@@ -62,7 +62,7 @@ public sealed class ErrorInfo
 
 public sealed class CharacterDto
 {
-    /// <summary>Slot-Nummer, entspricht der Ziffer in save_N.sav.</summary>
+    /// <summary>Slot number, matches the digit in save_N.sav.</summary>
     public int Index { get; init; }
 
     public string? Archetype { get; init; }
@@ -74,10 +74,10 @@ public sealed class CharacterDto
     public int TraitPoints { get; init; }
     public bool IsHardcore { get; init; }
 
-    /// <summary>Letzte Aenderung des Save-Slots, ISO 8601 in UTC.</summary>
+    /// <summary>Last modification of the save slot, ISO 8601 in UTC.</summary>
     public DateTime SaveDateTime { get; init; }
 
-    /// <summary><c>campaign</c> oder <c>adventure</c>.</summary>
+    /// <summary><c>campaign</c> or <c>adventure</c>.</summary>
     public string ActiveWorldSlot { get; init; } = "campaign";
 
     public double? PlaytimeSeconds { get; init; }
@@ -85,7 +85,7 @@ public sealed class CharacterDto
     public required CountsDto Counts { get; init; }
 
     /// <summary>
-    /// Besitzstand je Item. Enthaelt einen Eintrag fuer jedes Item aus
+    /// Ownership status per item. Contains one entry for every item in
     /// <see cref="AnalysisResult.Catalog"/>.
     /// </summary>
     public List<ItemStateDto> ItemStates { get; init; } = [];
@@ -100,13 +100,13 @@ public sealed class CountsDto
     public int Total { get; init; }
 
     /// <summary>
-    /// Der von der Bibliothek gemeldete Wert. Er weicht leicht von
-    /// <see cref="Acquired"/> ab, weil dort andere Typen mitgezaehlt werden;
-    /// mitgefuehrt, um Abweichungen im Mapping erkennen zu koennen.
+    /// The value reported by the library. It differs slightly from
+    /// <see cref="Acquired"/> because other types are counted there too;
+    /// kept around to be able to spot deviations in the mapping.
     /// </summary>
     public int AcquiredReported { get; init; }
 
-    /// <summary>Fortschritt je Kategorie, Schluessel ist die Kategorie.</summary>
+    /// <summary>Progress per category, keyed by category.</summary>
     public Dictionary<string, CategoryCountDto> ByCategory { get; init; } = [];
 }
 
@@ -116,27 +116,27 @@ public sealed class CategoryCountDto
     public int Total { get; init; }
 }
 
-/// <summary>Stammdaten eines sammelbaren Items, unabhaengig vom Charakter.</summary>
+/// <summary>Master data of a collectible item, independent of the character.</summary>
 public sealed class CatalogItemDto
 {
     public required string Id { get; init; }
     public required string Name { get; init; }
 
-    /// <summary>Kategorie aus db.json, z.B. <c>ring</c>, <c>weapon</c>, <c>trait</c>.</summary>
+    /// <summary>Category from db.json, e.g. <c>ring</c>, <c>weapon</c>, <c>trait</c>.</summary>
     public required string Category { get; init; }
 
-    /// <summary>Unterkategorie, z.B. <c>Long Gun</c> oder <c>Melee</c>.</summary>
+    /// <summary>Subcategory, e.g. <c>Long Gun</c> or <c>Melee</c>.</summary>
     public string? Subcategory { get; init; }
 
     public string? World { get; init; }
 
-    /// <summary>Art der Fundstelle, z.B. <c>Vendor</c> oder <c>World Drop</c>.</summary>
+    /// <summary>Kind of drop location, e.g. <c>Vendor</c> or <c>World Drop</c>.</summary>
     public string? DropType { get; init; }
 
-    /// <summary>Konkrete Fundstelle, z.B. der Haendlername.</summary>
+    /// <summary>Specific drop location, e.g. the vendor's name.</summary>
     public string? DropReference { get; init; }
 
-    /// <summary>Freitexthinweis aus db.json, wie man das Item bekommt.</summary>
+    /// <summary>Free-text hint from db.json on how to obtain the item.</summary>
     public string? Note { get; init; }
 
     public string? Prerequisite { get; init; }
@@ -144,23 +144,23 @@ public sealed class CatalogItemDto
     public bool AccountAward { get; init; }
 }
 
-/// <summary>Besitzstand eines Items bei einem bestimmten Charakter.</summary>
+/// <summary>Ownership status of an item for a particular character.</summary>
 public sealed class ItemStateDto
 {
     public required string Id { get; init; }
     public bool Acquired { get; init; }
 
-    // --- Nur bei erworbenen Items belegt ---
+    // --- Only populated for acquired items ---
     public int? Level { get; init; }
     public int? Quantity { get; init; }
     public bool Favorited { get; init; }
     public bool IsEquipped { get; init; }
 
     /// <summary>
-    /// Ob das Item in der aktuell gerollten Kampagne erreichbar ist.
-    /// <c>null</c> bedeutet unbekannt - entweder nicht geprueft (weil bereits
-    /// erworben) oder die Bibliothek konnte es nicht bestimmen; letzteres
-    /// steht dann als Hinweis in <see cref="AnalysisResult.Warnings"/>.
+    /// Whether the item is reachable in the currently rolled campaign.
+    /// <c>null</c> means unknown - either not checked (because it was
+    /// already acquired) or the library couldn't determine it; the latter
+    /// then shows up as a note in <see cref="AnalysisResult.Warnings"/>.
     /// </summary>
     public bool? ObtainableInCampaign { get; init; }
 
@@ -169,7 +169,7 @@ public sealed class ItemStateDto
 
 public sealed class WorldDto
 {
-    /// <summary><c>campaign</c> oder <c>adventure</c>.</summary>
+    /// <summary><c>campaign</c> or <c>adventure</c>.</summary>
     public required string Slot { get; init; }
     public string? Difficulty { get; init; }
     public double? PlaytimeSeconds { get; init; }
@@ -181,7 +181,7 @@ public sealed class ZoneDto
 {
     public required string Name { get; init; }
 
-    /// <summary>Der gerollte Story-Strang der Zone, z.B. <c>Empress</c>.</summary>
+    /// <summary>The zone's rolled story branch, e.g. <c>Empress</c>.</summary>
     public string? Story { get; init; }
 
     public bool Finished { get; init; }
@@ -209,7 +209,7 @@ public sealed class LootGroupDto
 {
     public string? Name { get; init; }
 
-    /// <summary>Art der Fundstelle, z.B. <c>location</c>, <c>event</c>, <c>vendor</c>.</summary>
+    /// <summary>Kind of drop location, e.g. <c>location</c>, <c>event</c>, <c>vendor</c>.</summary>
     public string? Type { get; init; }
 
     public string? EventDropReference { get; init; }
@@ -224,16 +224,16 @@ public sealed class LootItemDto
     public string? Subcategory { get; init; }
     public bool IsLooted { get; init; }
 
-    /// <summary>Ob das zum Herstellen noetige Material vorhanden ist.</summary>
+    /// <summary>Whether the material needed to craft it is available.</summary>
     public bool HasRequiredMaterial { get; init; }
 
-    /// <summary>Ob eine Voraussetzung fehlt, das Item also noch blockiert ist.</summary>
+    /// <summary>Whether a prerequisite is missing, i.e. the item is still blocked.</summary>
     public bool IsPrerequisiteMissing { get; init; }
 
     public bool CoopOnly { get; init; }
 }
 
-/// <summary>Ausgabe von <c>r2wa-parser catalog</c> - der reine Item-Katalog aus db.json.</summary>
+/// <summary>Output of <c>r2wa-parser catalog</c> - the plain item catalog from db.json.</summary>
 public sealed class CatalogResult
 {
     public int SchemaVersion { get; init; } = AnalysisResult.CurrentSchemaVersion;
@@ -242,7 +242,7 @@ public sealed class CatalogResult
     public List<CatalogItemDto> Items { get; init; } = [];
 }
 
-/// <summary>Ausgabe von <c>r2wa-parser version</c>.</summary>
+/// <summary>Output of <c>r2wa-parser version</c>.</summary>
 public sealed class VersionResult
 {
     public int SchemaVersion { get; init; } = AnalysisResult.CurrentSchemaVersion;

@@ -1,7 +1,7 @@
-"""Tests der Bruecke zum C#-Parser.
+"""Tests of the bridge to the C# parser.
 
-Die Fehlerpfade sind hier wichtiger als der Gutfall: die Oberflaeche muss jede
-Art von Parser-Fehlschlag anzeigen koennen, statt abzustuerzen.
+The error paths matter more here than the happy path: the UI must be able
+to display every kind of parser failure instead of crashing.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ class TestParseOutput:
                 "schema_version": 1,
                 "error": {
                     "kind": "save_dir_not_found",
-                    "message": "Verzeichnis nicht gefunden: /weg",
+                    "message": "Directory not found: /gone",
                     "detail": "Stacktrace",
                 },
             }
@@ -67,7 +67,7 @@ class TestParseOutput:
             parser_bridge.parse_output(payload)
 
         assert excinfo.value.kind == "save_dir_not_found"
-        assert "Verzeichnis nicht gefunden" in str(excinfo.value)
+        assert "Directory not found" in str(excinfo.value)
         assert excinfo.value.detail == "Stacktrace"
 
     def test_falsche_schemaversion(self) -> None:
@@ -104,17 +104,17 @@ class TestFindParser:
     def test_fehlermeldung_nennt_gesuchte_pfade(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # Ohne umgelenkte Repo-Wurzel wuerde ein tatsaechlich gebautes Binary
-        # im Arbeitsverzeichnis gefunden und der Test ginge ins Leere.
+        # Without redirecting the repo root, an actually built binary in the
+        # working directory would be found and the test would test nothing.
         monkeypatch.delenv("R2WA_PARSER", raising=False)
-        monkeypatch.setattr(parser_bridge, "REPO_ROOT", tmp_path / "leeres-repo")
+        monkeypatch.setattr(parser_bridge, "REPO_ROOT", tmp_path / "empty-repo")
         monkeypatch.setattr(parser_bridge.shutil, "which", lambda _: None)
 
         with pytest.raises(ParserNotFoundError) as excinfo:
-            parser_bridge.find_parser(tmp_path / "gibt-es-nicht")
+            parser_bridge.find_parser(tmp_path / "does-not-exist")
 
         assert excinfo.value.kind == "parser_not_found"
-        assert "gibt-es-nicht" in str(excinfo.value)
+        assert "does-not-exist" in str(excinfo.value)
 
     def test_findet_binary_im_build_verzeichnis(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -138,22 +138,22 @@ class TestBuildCommand:
 
 @pytest.fixture(scope="module")
 def real_analysis():
-    """Analyse eines echten Savegames - nur wenn eines konfiguriert ist."""
+    """Analysis of a real save game - only if one is configured."""
     save_dir = os.environ.get("R2WA_TEST_SAVE_DIR")
     if not save_dir:
-        pytest.skip("R2WA_TEST_SAVE_DIR auf ein echtes Savegame-Verzeichnis setzen")
+        pytest.skip("Set R2WA_TEST_SAVE_DIR to a real save game directory")
     return parser_bridge.analyze(save_dir)
 
 
 class TestGegenEchtesSavegame:
-    """Integrationstest gegen ein echtes Savegame und das gebaute Binary.
+    """Integration test against a real save game and the built binary.
 
-    Prueft nur Invarianten, die unabhaengig vom konkreten Spielstand gelten -
-    so bleibt der Test auch mit einem anderen Savegame gueltig.
+    Only checks invariants that hold regardless of the specific save game -
+    that way the test stays valid even with a different save.
     """
 
     def test_katalog_ist_vollstaendig(self, real_analysis) -> None:
-        # Der Katalog stammt aus db.json und ist charakterunabhaengig.
+        # The catalog comes from db.json and is independent of the character.
         assert len(real_analysis.catalog) > 800
         assert real_analysis.characters
 
@@ -182,8 +182,8 @@ class TestGegenEchtesSavegame:
         assert aggregate.total == len(real_analysis.catalog)
 
     def test_erworbene_items_gelten_nicht_als_erreichbarkeitsfrage(self, real_analysis) -> None:
-        # Fuer bereits gefundene Items wird die Erreichbarkeit nicht geprueft;
-        # sie muss deshalb unbekannt bleiben.
+        # Reachability is not checked for items already found; it must
+        # therefore stay unknown.
         for character in real_analysis.characters:
             for item in character.items:
                 if item.acquired:

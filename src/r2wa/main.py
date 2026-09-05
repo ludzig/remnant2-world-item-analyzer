@@ -1,4 +1,4 @@
-"""Einstiegspunkt der Anwendung."""
+"""Entry point of the application."""
 
 from __future__ import annotations
 
@@ -15,15 +15,15 @@ from gi.repository import Adw, Gio, Gtk  # noqa: E402
 from . import APP_ID, __version__  # noqa: E402
 from .window import Window  # noqa: E402
 
-#: Mindestversionen. Die Item-Liste nutzt Abschnitte in Gtk.ListView und
-#: Gtk.ListBox.remove_all(), beides ab GTK 4.12; Adw.AboutDialog kam mit
-#: libadwaita 1.5 (GNOME 46). Damit ist GNOME 46 die Untergrenze.
+#: Minimum versions. The item list uses sections in Gtk.ListView and
+#: Gtk.ListBox.remove_all(), both since GTK 4.12; Adw.AboutDialog arrived
+#: with libadwaita 1.5 (GNOME 46). That makes GNOME 46 the floor.
 REQUIRED_GTK = (4, 12)
 REQUIRED_ADW = (1, 5)
 
 
 class Application(Adw.Application):
-    """Die Anwendung selbst."""
+    """The application itself."""
 
     def __init__(self, save_dir: str | None = None):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
@@ -65,14 +65,14 @@ class Application(Adw.Application):
             application_icon=APP_ID,
             version=__version__,
             comments=(
-                "Zeigt für jeden Charakter, welche Items gefunden sind und "
-                "welche noch fehlen, und was in den gerollten Welten steckt."
+                "Shows, for every character, which items have been found and "
+                "which are still missing, plus what's in the currently rolled worlds."
             ),
             license_type=Gtk.License.MIT_X11,
             developer_name="RustySilver",
         )
         about.add_credit_section(
-            "Savegame-Auswertung",
+            "Save Game Analysis",
             [
                 "AndrewSav https://github.com/AndrewSav/lib.remnant2.analyzer",
                 "t1nky https://github.com/t1nky/remnant-item-finder",
@@ -82,19 +82,19 @@ class Application(Adw.Application):
 
 
 def _check_versions() -> str | None:
-    """Pruefe die Laufzeitversionen; gib eine Meldung zurueck, wenn zu alt."""
+    """Check the runtime versions; return a message if they are too old."""
     gtk_version = (Gtk.get_major_version(), Gtk.get_minor_version())
     adw_version = (Adw.get_major_version(), Adw.get_minor_version())
 
     if gtk_version < REQUIRED_GTK:
         return (
-            f"GTK {REQUIRED_GTK[0]}.{REQUIRED_GTK[1]} oder neuer wird benötigt, "
-            f"gefunden wurde {gtk_version[0]}.{gtk_version[1]}."
+            f"GTK {REQUIRED_GTK[0]}.{REQUIRED_GTK[1]} or newer is required, "
+            f"found {gtk_version[0]}.{gtk_version[1]}."
         )
     if adw_version < REQUIRED_ADW:
         return (
-            f"libadwaita {REQUIRED_ADW[0]}.{REQUIRED_ADW[1]} oder neuer wird "
-            f"benötigt, gefunden wurde {adw_version[0]}.{adw_version[1]}."
+            f"libadwaita {REQUIRED_ADW[0]}.{REQUIRED_ADW[1]} or newer is "
+            f"required, found {adw_version[0]}.{adw_version[1]}."
         )
     return None
 
@@ -102,12 +102,12 @@ def _check_versions() -> str | None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="r2wa",
-        description="Remnant 2 World & Item Analyzer für GNOME.",
+        description="Remnant 2 World & Item Analyzer for GNOME.",
     )
     parser.add_argument(
         "save_dir",
         nargs="?",
-        help="Savegame-Verzeichnis (sonst wird automatisch gesucht)",
+        help="Save game directory (otherwise found automatically)",
     )
     parser.add_argument("--version", action="version", version=f"r2wa {__version__}")
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])

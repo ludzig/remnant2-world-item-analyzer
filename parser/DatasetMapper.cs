@@ -5,17 +5,17 @@ using R2wa.Parser.Contract;
 namespace R2wa.Parser;
 
 /// <summary>
-/// Uebersetzt das <see cref="Dataset"/> der Analyzer-Bibliothek in den
-/// JSON-Vertrag. Dies ist die einzige Klasse, die die Upstream-Typen kennt.
+/// Translates the analyzer library's <see cref="Dataset"/> into the JSON
+/// contract. This is the only class that knows about the upstream types.
 /// </summary>
 public static class DatasetMapper
 {
     /// <summary>
-    /// Item-Kategorien, die fuer eine Sammel-Checkliste zaehlen.
-    /// <c>Analyzer.InventoryTypes</c> deckt die Ausruestung ab; Traits fuehrt
-    /// die Bibliothek getrennt, gehoeren aus Spielersicht aber dazu.
-    /// Nicht enthalten sind Material, Waehrung, Skills und Questgegenstaende -
-    /// das sind keine sammelbaren Fundstuecke.
+    /// Item categories that count for a collection checklist.
+    /// <c>Analyzer.InventoryTypes</c> covers equipment; the library keeps
+    /// traits separate, but from a player's perspective they belong here too.
+    /// Not included: material, currency, skills, and quest items - those
+    /// aren't collectible finds.
     /// </summary>
     private static readonly HashSet<string> CollectibleTypes =
         [.. Analyzer.InventoryTypes, "trait"];
@@ -24,9 +24,9 @@ public static class DatasetMapper
     {
         var warnings = new List<string>();
 
-        // Der Katalog kommt aus db.json und ist fuer alle Charaktere gleich.
-        // Damit ein Charakter zu jedem Katalogeintrag einen Zustand liefern
-        // kann, wird er hier einmal aufgebaut und unten nur noch referenziert.
+        // The catalog comes from db.json and is the same for every character.
+        // So a character can deliver a state for every catalog entry, it's
+        // built once here and only referenced below.
         var catalog = BuildCatalogItems();
         var catalogIds = catalog.Select(item => item.Id).ToList();
 
@@ -39,8 +39,8 @@ public static class DatasetMapper
             }
             catch (Exception ex)
             {
-                // Ein kaputter Slot darf nicht die uebrigen Charaktere kosten.
-                warnings.Add($"Slot {character.Index} konnte nicht ausgewertet werden: {ex.Message}");
+                // A broken slot must not cost us the remaining characters.
+                warnings.Add($"Slot {character.Index} could not be evaluated: {ex.Message}");
             }
         }
 
@@ -87,21 +87,21 @@ public static class DatasetMapper
     }
 
     /// <summary>
-    /// Bestimmt fuer jeden Katalogeintrag, ob der Charakter ihn besitzt.
+    /// Determines, for every catalog entry, whether the character owns it.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Das Inventar der Bibliothek enthaelt auch Nicht-Sammelobjekte wie
-    /// Material oder Waehrung; massgeblich ist deshalb der Katalog, nicht das
-    /// Inventar. Was im Inventar steht, aber nicht im Katalog, ist bewusst
-    /// nicht Teil der Checkliste.
+    /// The library's inventory also contains non-collectible objects such as
+    /// material or currency; the catalog is therefore authoritative, not the
+    /// inventory. Anything that's in the inventory but not in the catalog is
+    /// deliberately not part of the checklist.
     /// </para>
     /// <para>
-    /// Ein Inventareintrag allein bedeutet noch keinen Besitz: aufgebrauchte
-    /// Verbrauchsgegenstaende und Gebraeue bleiben mit <c>Quantity == 0</c>
-    /// stehen. Genau diese fuehrt die Bibliothek parallel unter MissingItems.
-    /// Die Regel "im Inventar und Menge ungleich 0" reproduziert deren
-    /// FilteredInventory ueber alle geprueften Slots exakt.
+    /// An inventory entry alone doesn't mean ownership: consumed
+    /// consumables and concoctions stay listed with <c>Quantity == 0</c>.
+    /// The library tracks exactly these in parallel under MissingItems. The
+    /// rule "in the inventory and quantity not zero" reproduces its
+    /// FilteredInventory exactly across every slot checked.
     /// </para>
     /// </remarks>
     private static List<ItemStateDto> MapItemStates(
@@ -146,21 +146,21 @@ public static class DatasetMapper
     }
 
     /// <summary>
-    /// Ermittelt, ob ein fehlendes Item in den aktuell gerollten Welten
-    /// erreichbar ist.
+    /// Determines whether a missing item is reachable in the currently
+    /// rolled worlds.
     /// </summary>
     /// <remarks>
-    /// <c>RolledWorld.CanGetItem</c> wirft bei einzelnen Items mit
-    /// Voraussetzungen eine InvalidOperationException (Fehler in
-    /// CheckPrerequisites stromaufwaerts, beobachtet bei
-    /// Amulet_OneTrueKingSigil). Das darf die Analyse nicht abbrechen -
-    /// solche Items werden als "unbekannt" gefuehrt und gemeldet.
+    /// <c>RolledWorld.CanGetItem</c> throws an InvalidOperationException for
+    /// certain items with prerequisites (an upstream bug in
+    /// CheckPrerequisites, observed for Amulet_OneTrueKingSigil). This must
+    /// not abort the analysis - such items are reported as "unknown" and
+    /// recorded as a warning.
     /// </remarks>
     private static (bool? Campaign, bool? Adventure) Obtainable(
         Character character, string id, List<string> warnings)
     {
-        return (Check(character.Save?.Campaign, "Kampagne"),
-                Check(character.Save?.Adventure, "Abenteuer"));
+        return (Check(character.Save?.Campaign, "campaign"),
+                Check(character.Save?.Adventure, "adventure"));
 
         bool? Check(RolledWorld? world, string label)
         {
@@ -172,8 +172,8 @@ public static class DatasetMapper
             catch (Exception ex)
             {
                 warnings.Add(
-                    $"Slot {character.Index}: Erreichbarkeit von '{id}' in der {label} " +
-                    $"nicht bestimmbar ({ex.GetType().Name}).");
+                    $"Slot {character.Index}: reachability of '{id}' in the {label} " +
+                    $"could not be determined ({ex.GetType().Name}).");
                 return null;
             }
         }
@@ -222,7 +222,7 @@ public static class DatasetMapper
         Difficulty = Blank(world.Difficulty),
         PlaytimeSeconds = world.Playtime?.TotalSeconds,
         RespawnPoint = Blank(world.RespawnPoint?.Name),
-        // AllZones enthaelt zusaetzlich Ward 13, das nicht in Zones steht.
+        // AllZones additionally includes Ward 13, which isn't in Zones.
         Zones = [.. world.AllZones.Select(MapZone)],
     };
 
@@ -271,7 +271,7 @@ public static class DatasetMapper
         CoopOnly = IsTrue(item.Properties.GetValueOrDefault("Coop")),
     };
 
-    /// <summary>Ausgabe fuer <c>r2wa-parser catalog</c> - Katalog ohne Savegame.</summary>
+    /// <summary>Output for <c>r2wa-parser catalog</c> - catalog without a save game.</summary>
     public static CatalogResult BuildCatalog() => new()
     {
         Generator = BuildInfo.Generator,
@@ -280,9 +280,9 @@ public static class DatasetMapper
     };
 
     /// <summary>
-    /// Liest alle sammelbaren Items aus db.json, sortiert nach Kategorie und
-    /// Name. Die Reihenfolge ist stabil, damit sich Fixture-Vergleiche nicht
-    /// grundlos aendern.
+    /// Reads every collectible item from db.json, sorted by category and
+    /// name. The order is stable so fixture comparisons don't change without
+    /// reason.
     /// </summary>
     private static List<CatalogItemDto> BuildCatalogItems()
     {
@@ -299,8 +299,8 @@ public static class DatasetMapper
             items.Add(new CatalogItemDto
             {
                 Id = id,
-                // Nicht jeder db.json-Eintrag hat einen Anzeigenamen; dann ist
-                // die technische Id immer noch besser als eine leere Zeile.
+                // Not every db.json entry has a display name; in that case
+                // the technical id still beats an empty row.
                 Name = Blank(row.GetValueOrDefault("Name")) ?? id,
                 Category = type,
                 Subcategory = Blank(row.GetValueOrDefault("Subtype")),
@@ -325,7 +325,7 @@ public static class DatasetMapper
         return items;
     }
 
-    /// <summary>Leere und nur aus Leerzeichen bestehende Werte werden zu null.</summary>
+    /// <summary>Empty and whitespace-only values become null.</summary>
     private static string? Blank(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value;
 
