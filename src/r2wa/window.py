@@ -1,4 +1,4 @@
-"""Das Hauptfenster: Charakterliste links, Items und Welten rechts."""
+"""The main window: character list on the left, items and worlds on the right."""
 
 from __future__ import annotations
 
@@ -18,48 +18,58 @@ from .parser_bridge import ParserError, analyze_async  # noqa: E402
 from .views.items import ItemsView  # noqa: E402
 from .views.worlds import WorldsView  # noqa: E402
 
-#: Wartezeit nach einer Dateiaenderung, bevor neu analysiert wird. Das Spiel
-#: schreibt beim Speichern mehrere Dateien kurz hintereinander.
+#: Delay after a file change before re-analyzing. The game writes several
+#: files in quick succession when saving.
 RELOAD_DEBOUNCE_MS = 2000
+
+#: Window size on first ever start, before any size has been remembered.
+DEFAULT_WIDTH = 1100
+DEFAULT_HEIGHT = 760
 
 
 class Window(Adw.ApplicationWindow):
-    """Hauptfenster der Anwendung."""
+    """Main window of the application."""
 
     __gtype_name__ = "R2waWindow"
 
     def __init__(self, application: Adw.Application, save_dir: str | None = None):
         super().__init__(application=application, title="Remnant 2 Analyzer")
-        self.set_default_size(1100, 760)
 
         self._analysis: Analysis | None = None
         self._location: SaveLocation | None = None
         self._settings = Settings.load()
-        # Ein Pfad von der Kommandozeile gilt nur fuer diesen Start und wird
-        # nicht gespeichert; die gemerkte Wahl bleibt davon unberuehrt.
+        # A path from the command line only applies to this run and is not
+        # saved; the remembered choice is unaffected by it.
         self._explicit_save_dir = save_dir or self._settings.save_dir
         self._monitor: Gio.FileMonitor | None = None
         self._reload_source: int | None = None
         self._loading = False
 
+        self.set_default_size(
+            self._settings.window_width or DEFAULT_WIDTH,
+            self._settings.window_height or DEFAULT_HEIGHT,
+        )
+        if self._settings.window_maximized:
+            self.maximize()
+
         self._build_ui()
         self.load()
 
     # ------------------------------------------------------------------
-    # Aufbau
+    # Layout
     # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
         self._items_view = ItemsView()
         self._worlds_view = WorldsView()
 
-        # vexpand ist noetig, weil der Stack in einer Box unter dem Banner
-        # sitzt und Box-Kinder sonst nur ihre Mindesthoehe bekommen.
+        # vexpand is needed because the stack sits in a box below the
+        # banner, and box children otherwise only get their minimum height.
         self._stack = Adw.ViewStack(vexpand=True)
         self._stack.add_titled_with_icon(
             self._items_view, "items", "Items", "view-list-bullet-symbolic"
         )
-        self._stack.add_titled_with_icon(self._worlds_view, "worlds", "Welten", "map-symbolic")
+        self._stack.add_titled_with_icon(self._worlds_view, "worlds", "Worlds", "map-symbolic")
 
         self._banner = Adw.Banner(revealed=False)
         self._banner.connect("button-clicked", lambda _b: self._banner.set_revealed(False))
@@ -72,18 +82,18 @@ class Window(Adw.ApplicationWindow):
         self._content_toolbar.add_top_bar(self._build_content_header())
 
         self._split = Adw.NavigationSplitView(
-            sidebar=Adw.NavigationPage(title="Charaktere", child=self._build_sidebar()),
-            content=Adw.NavigationPage(title="Übersicht", child=self._content_toolbar),
+            sidebar=Adw.NavigationPage(title="Characters", child=self._build_sidebar()),
+            content=Adw.NavigationPage(title="Overview", child=self._content_toolbar),
         )
         self._split.set_min_sidebar_width(260)
         self._split.set_max_sidebar_width(340)
 
-        # Bei schmalem Fenster wird die Seitenleiste zur eigenen Seite.
+        # On a narrow window the sidebar becomes its own page.
         breakpoint_ = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 720px"))
         breakpoint_.add_setter(self._split, "collapsed", True)
         self.add_breakpoint(breakpoint_)
 
-        # Der Leerzustand ersetzt das gesamte Fenster, solange nichts geladen ist.
+        # The empty state replaces the whole window as long as nothing is loaded.
         self._placeholder = self._build_placeholder()
 
         self._root = Gtk.Stack()
@@ -98,7 +108,9 @@ class Window(Adw.ApplicationWindow):
             selection_mode=Gtk.SelectionMode.SINGLE,
             css_classes=["navigation-sidebar"],
         )
-        self._character_list.connect("row-selected", self._on_character_selected)
+        self._character_selection_handler = self._character_list.connect(
+            "row-selected", self._on_character_selected
+        )
 
         toolbar = Adw.ToolbarView(
             content=Gtk.ScrolledWindow(child=self._character_list, vexpand=True)
@@ -118,7 +130,7 @@ class Window(Adw.ApplicationWindow):
 
         self._reload_button = Gtk.Button(
             icon_name="view-refresh-symbolic",
-            tooltip_text="Savegame neu einlesen",
+            tooltip_text="Re-read save game",
         )
         self._reload_button.connect("clicked", lambda _b: self.load())
         header.pack_start(self._reload_button)
@@ -130,28 +142,28 @@ class Window(Adw.ApplicationWindow):
 
     def _build_menu_button(self) -> Gtk.MenuButton:
         menu = Gio.Menu()
-        menu.append("Ordner öffnen…", "win.open-folder")
-        menu.append("Neu einlesen", "win.reload")
-        menu.append("Über r2wa", "app.about")
+        menu.append("Open Folder…", "win.open-folder")
+        menu.append("Reload", "win.reload")
+        menu.append("About r2wa", "app.about")
 
         return Gtk.MenuButton(
             icon_name="open-menu-symbolic",
             menu_model=menu,
-            tooltip_text="Hauptmenü",
+            tooltip_text="Main Menu",
         )
 
     def _build_placeholder(self) -> Gtk.Widget:
         self._status = Adw.StatusPage(
             icon_name="folder-saved-search-symbolic",
-            title="Kein Savegame gefunden",
+            title="No Save Game Found",
             description=(
-                "Es wurde kein Remnant-2-Savegame im Proton-Prefix gefunden. "
-                "Wähle das Verzeichnis mit profile.sav von Hand aus."
+                "No Remnant 2 save game was found in a Proton prefix. "
+                "Choose the directory containing profile.sav by hand."
             ),
         )
 
         button = Gtk.Button(
-            label="Ordner wählen…",
+            label="Choose Folder…",
             halign=Gtk.Align.CENTER,
             css_classes=["pill", "suggested-action"],
         )
@@ -165,20 +177,20 @@ class Window(Adw.ApplicationWindow):
         return toolbar
 
     # ------------------------------------------------------------------
-    # Laden
+    # Loading
     # ------------------------------------------------------------------
 
     def load(self) -> None:
-        """Suche ein Savegame und starte die Analyse."""
+        """Look for a save game and start the analysis."""
         if self._loading:
             return
 
         location = self._resolve_location()
         if location is None:
             self._show_placeholder(
-                "Kein Savegame gefunden",
-                "Es wurde kein Remnant-2-Savegame im Proton-Prefix gefunden. "
-                "Wähle das Verzeichnis mit profile.sav von Hand aus.",
+                "No Save Game Found",
+                "No Remnant 2 save game was found in a Proton prefix. "
+                "Choose the directory containing profile.sav by hand.",
             )
             return
 
@@ -215,10 +227,10 @@ class Window(Adw.ApplicationWindow):
         if analysis.warnings:
             count = len(analysis.warnings)
             self._banner.set_title(
-                f"{count} Hinweis{'e' if count != 1 else ''} beim Einlesen – "
-                "einzelne Items konnten nicht vollständig ausgewertet werden."
+                f"{count} warning{'s' if count != 1 else ''} while reading - "
+                "some items could not be fully evaluated."
             )
-            self._banner.set_button_label("Ausblenden")
+            self._banner.set_button_label("Dismiss")
             self._banner.set_revealed(True)
         else:
             self._banner.set_revealed(False)
@@ -228,19 +240,19 @@ class Window(Adw.ApplicationWindow):
 
         if error.kind == "parser_not_found":
             description = (
-                "Das Parser-Binary fehlt. Baue es mit\n\n"
+                "The parser binary is missing. Build it with\n\n"
                 "    just build-parser\n\n"
-                "oder setze R2WA_PARSER auf den Pfad des Binaries."
+                "or set R2WA_PARSER to the path of the binary."
             )
         else:
-            # Fehlertexte enthalten Pfade und Meldungen des Parsers. Bei
-            # Adw.StatusPage rendert die Beschreibung als Pango-Markup, der
-            # Titel dagegen nicht - ein "&" im Text bricht sonst die Anzeige.
-            # Gleiches gilt fuer Adw.ActionRow (beide Felder Markup);
-            # Adw.Banner nimmt seinen Titel wiederum wortwoertlich.
+            # Error texts contain paths and messages from the parser.
+            # Adw.StatusPage renders the description as Pango markup, the
+            # title does not - an "&" in the text would otherwise break the
+            # display. The same applies to Adw.ActionRow (both fields are
+            # markup); Adw.Banner, in turn, takes its title verbatim.
             description = GLib.markup_escape_text(str(error))
 
-        self._show_placeholder("Analyse fehlgeschlagen", description)
+        self._show_placeholder("Analysis Failed", description)
 
     def _show_placeholder(self, title: str, description: str) -> None:
         self._status.set_title(title)
@@ -248,18 +260,27 @@ class Window(Adw.ApplicationWindow):
         self._root.set_visible_child_name("placeholder")
 
     # ------------------------------------------------------------------
-    # Charakterliste
+    # Character list
     # ------------------------------------------------------------------
 
     def _populate_characters(self, analysis: Analysis) -> None:
         previous = self._selected_index()
 
-        self._character_list.remove_all()
-        for character in analysis.characters:
-            self._character_list.append(_CharacterRow(character, analysis))
+        # Emptying the list deselects, and Gtk.ListBox reports that as a
+        # selection of None. Left through, every reload tears both views down
+        # to their "no character" state and rebuilds them a moment later -
+        # wasted work on a catalog of hundreds of items, and a visible flicker
+        # while the game is running.
+        self._character_list.handler_block(self._character_selection_handler)
+        try:
+            self._character_list.remove_all()
+            for character in analysis.characters:
+                self._character_list.append(_CharacterRow(character, analysis))
+        finally:
+            self._character_list.handler_unblock(self._character_selection_handler)
 
-        # Beim erneuten Einlesen bleibt die Auswahl stehen; beim ersten Start
-        # zaehlt der zuletzt betrachtete Charakter, sonst der im Spiel aktive.
+        # On a reload the selection stays put; on the first start, the last
+        # viewed character wins, otherwise the one active in the game.
         row = None
         for candidate in (
             previous,
@@ -295,21 +316,21 @@ class Window(Adw.ApplicationWindow):
 
     def _show_character(self, character: Character | None) -> None:
         self._items_view.set_analysis(self._analysis, character)
-        self._worlds_view.set_character(character)
+        self._worlds_view.set_analysis(self._analysis, character)
 
     # ------------------------------------------------------------------
-    # Ordnerauswahl und Dateiueberwachung
+    # Folder selection and file monitoring
     # ------------------------------------------------------------------
 
     def choose_folder(self) -> None:
-        """Savegame-Verzeichnis von Hand waehlen."""
-        dialog = Gtk.FileDialog(title="Savegame-Verzeichnis wählen")
+        """Choose the save game directory by hand."""
+        dialog = Gtk.FileDialog(title="Choose Save Game Directory")
 
         def chosen(source: Gtk.FileDialog, result: Gio.AsyncResult) -> None:
             try:
                 folder = source.select_folder_finish(result)
             except GLib.Error:
-                return  # Abgebrochen - keine Meldung noetig.
+                return  # Cancelled - no message needed.
             if folder is None or folder.get_path() is None:
                 return
 
@@ -321,7 +342,7 @@ class Window(Adw.ApplicationWindow):
         dialog.select_folder(self, None, chosen)
 
     def _watch(self, path: Path) -> None:
-        """Beobachte das Savegame-Verzeichnis und lies nach Aenderungen neu ein."""
+        """Watch the save game directory and re-read after changes."""
         self._cancel_pending_reload()
         if self._monitor is not None:
             self._monitor.cancel()
@@ -332,7 +353,7 @@ class Window(Adw.ApplicationWindow):
                 Gio.FileMonitorFlags.NONE, None
             )
         except GLib.Error:
-            return  # Ohne Ueberwachung bleibt der manuelle Knopf.
+            return  # Without monitoring, the manual button still works.
 
         self._monitor.connect("changed", self._on_save_changed)
 
@@ -354,8 +375,8 @@ class Window(Adw.ApplicationWindow):
         if not name.endswith(".sav"):
             return
 
-        # Das Spiel schreibt beim Speichern mehrere Dateien; erst nach einer
-        # kurzen Ruhephase neu einlesen.
+        # The game writes several files when saving; only re-read after a
+        # short quiet period.
         self._cancel_pending_reload()
         self._reload_source = GLib.timeout_add(RELOAD_DEBOUNCE_MS, self._reload_now)
 
@@ -374,12 +395,20 @@ class Window(Adw.ApplicationWindow):
         if self._monitor is not None:
             self._monitor.cancel()
             self._monitor = None
+
+        # Only remember the unmaximized size - otherwise un-maximizing later
+        # would restore to a window that fills the screen.
+        self._settings.window_maximized = self.is_maximized()
+        if not self.is_maximized():
+            self._settings.window_width = self.get_width()
+            self._settings.window_height = self.get_height()
+
         self._settings.save()
         return False
 
 
 class _CharacterRow(Gtk.ListBoxRow):
-    """Eine Zeile der Charakterliste mit Fortschrittsbalken."""
+    """A row of the character list with a progress bar."""
 
     __gtype_name__ = "R2waCharacterRow"
 
@@ -397,7 +426,7 @@ class _CharacterRow(Gtk.ListBoxRow):
         )
 
         title_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        # Gtk.Label stellt Text ohne Markup dar, deshalb unmaskiert.
+        # Gtk.Label renders text without markup, hence unescaped.
         title = Gtk.Label(
             label=character.title,
             xalign=0.0,
@@ -410,14 +439,14 @@ class _CharacterRow(Gtk.ListBoxRow):
         if character.is_hardcore:
             title_row.append(Gtk.Label(label="Hardcore", css_classes=["caption", "error"]))
         if character.index == analysis.active_character_index:
-            title_row.append(Gtk.Label(label="aktiv", css_classes=["caption", "accent"]))
+            title_row.append(Gtk.Label(label="active", css_classes=["caption", "accent"]))
         box.append(title_row)
 
         details = " · ".join(
             part
             for part in (
                 f"Slot {character.index + 1}",
-                f"Stufe {character.power_level}",
+                f"Level {character.display_power_level}",
                 format_playtime(character.playtime_seconds),
             )
             if part
@@ -427,7 +456,7 @@ class _CharacterRow(Gtk.ListBoxRow):
         counts = character.counts
         progress = Gtk.ProgressBar(fraction=counts.fraction, margin_top=4)
         progress.set_tooltip_text(
-            f"{counts.acquired} von {counts.total} gefunden, {counts.missing} fehlen"
+            f"{counts.acquired} of {counts.total} found, {counts.missing} missing"
         )
         box.append(progress)
 
