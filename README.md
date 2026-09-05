@@ -6,6 +6,11 @@ currently rolled worlds with their zones, locations, and loot spots.
 
 No backups, no saving, no touching the save game.
 
+![The worlds view: characters on the left, then the zones of the rolled
+campaign, the locations of the selected zone, and its loot - each item with
+its icon, a note on where to find it, and a link to the
+wiki](docs/screenshot.png)
+
 ## Architecture
 
 The save game parser only exists as a C# library. Instead of reimplementing
