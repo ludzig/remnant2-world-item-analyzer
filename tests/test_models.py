@@ -1,4 +1,4 @@
-"""Tests des Datenmodells gegen das Fixture."""
+"""Tests of the data model against the fixture."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ class TestAnalysis:
         assert len(analysis.catalog) == 7
         assert len(analysis.characters) == 2
         assert analysis.warnings == (
-            "Slot 0: Erreichbarkeit von 'Amulet_OneTrueKingSigil' nicht bestimmbar.",
+            "Slot 0: reachability of 'Amulet_OneTrueKingSigil' could not be determined.",
         )
 
     def test_aktiver_charakter(self, analysis: Analysis) -> None:
@@ -36,7 +36,7 @@ class TestAnalysis:
         assert analysis.active_character.index == 1
 
     def test_faellt_auf_ersten_charakter_zurueck(self, analysis: Analysis) -> None:
-        # Ein Index, den es nicht gibt, darf die Oberflaeche nicht leer lassen.
+        # An index that doesn't exist must not leave the UI empty.
         broken = Analysis(
             schema_version=1,
             save_dir="",
@@ -83,8 +83,8 @@ class TestCharacter:
 
         assert campaign is not None
         assert campaign.difficulty == "Veteran"
-        assert campaign.label == "Kampagne"
-        assert character.world("adventure").label == "Abenteuer"
+        assert campaign.label == "Campaign"
+        assert character.world("adventure").label == "Adventure"
         assert character.world("gibtsnicht") is None
 
     def test_zeitstempel_wird_geparst(self, analysis: Analysis) -> None:
@@ -122,9 +122,9 @@ class TestItem:
 
         assert items["Ring_RingOfTheAdmiral"].state.obtainable_now is True
         assert items["Amulet_ButchersFetish"].state.obtainable_now is False
-        # Nur in der Kampagne erreichbar reicht aus.
+        # Reachable in the campaign alone is enough.
         assert items["Weapon_DecayedClaws"].state.obtainable_now is True
-        # Unbekannt (null) darf nicht als erreichbar gelten.
+        # Unknown (null) must not count as reachable.
         assert items["Consumable_MysteryItem"].state.obtainable_now is False
 
     def test_herkunftstext(self, analysis: Analysis) -> None:
@@ -138,11 +138,11 @@ class TestAggregation:
     def test_item_gilt_als_gefunden_wenn_ein_charakter_es_hat(self, analysis: Analysis) -> None:
         aggregate = {i.id: i for i in analysis.aggregate_items()}
 
-        # Slot 0 hat den Ring, Slot 1 nicht.
+        # Slot 0 has the ring, slot 1 doesn't.
         assert aggregate["Ring_ProbabilityCord"].acquired is True
-        # Umgekehrt: nur Slot 1 hat das Amulett.
+        # The other way around: only slot 1 has the amulet.
         assert aggregate["Amulet_ButchersFetish"].acquired is True
-        # Niemand hat es.
+        # Nobody has it.
         assert aggregate["Consumable_MysteryItem"].acquired is False
 
     def test_aggregat_enthaelt_jedes_item_genau_einmal(self, analysis: Analysis) -> None:
@@ -154,7 +154,7 @@ class TestAggregation:
     def test_aggregierte_zaehler(self, analysis: Analysis) -> None:
         counts = analysis.aggregate_counts()
 
-        # Slot 0 hat 3, Slot 1 hat 2, davon ist keines identisch -> 5 gefunden.
+        # Slot 0 has 3, slot 1 has 2, none of them identical -> 5 found.
         assert counts.acquired == 5
         assert counts.missing == 2
         assert counts.total == 7
@@ -162,7 +162,7 @@ class TestAggregation:
     def test_aggregat_ist_sortiert(self, analysis: Analysis) -> None:
         categories = [i.category for i in analysis.aggregate_items()]
 
-        # weapon steht in CATEGORY_ORDER vor ring, ring vor amulet.
+        # weapon comes before ring in CATEGORY_ORDER, ring before amulet.
         assert categories.index("weapon") < categories.index("ring")
         assert categories.index("ring") < categories.index("amulet")
 
@@ -191,9 +191,9 @@ class TestSortierungUndGruppierung:
         assert key_known < key_unknown
 
     def test_kategorielabel(self) -> None:
-        assert models.category_label("ring") == "Ringe"
-        assert models.category_label("fragment") == "Reliktsplitter"
-        # Unbekanntes faellt lesbar zurueck statt zu scheitern.
+        assert models.category_label("ring") == "Rings"
+        assert models.category_label("fragment") == "Relic Fragments"
+        # Unknown falls back to something readable instead of failing.
         assert models.category_label("dlc_neuheit") == "Dlc_neuheit"
 
 
@@ -221,7 +221,7 @@ class TestWelten:
         campaign = analysis.character(0).world("campaign")
         yaesha = campaign.zones[1]
 
-        # Probability Cord ist eingesammelt, Chakra nicht.
+        # Probability Cord has been collected, Chakra hasn't.
         assert yaesha.locations[0].open_item_count == 1
         assert yaesha.open_item_count == 1
         assert campaign.zones[0].open_item_count == 1
@@ -230,7 +230,7 @@ class TestWelten:
         campaign = analysis.character(0).world("campaign")
 
         assert campaign.zones[0].locations[0].loot_groups[0].label == "Reggie"
-        # Ohne Name greift die Event-Referenz.
+        # Without a name, the event reference takes over.
         assert campaign.zones[1].locations[0].loot_groups[0].label == "Quest_Yaesha_Empress"
 
 

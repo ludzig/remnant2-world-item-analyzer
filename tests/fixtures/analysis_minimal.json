@@ -12,7 +12,7 @@
       "world": "World_Yaesha",
       "drop_type": "Location",
       "drop_reference": "The Far Woods",
-      "note": "Zufallsfund im Ueberland"
+      "note": "Random find in the overworld"
     },
     {
       "id": "Ring_RingOfTheAdmiral",
@@ -234,5 +234,5 @@
       "worlds": []
     }
   ],
-  "warnings": ["Slot 0: Erreichbarkeit von 'Amulet_OneTrueKingSigil' nicht bestimmbar."]
+  "warnings": ["Slot 0: reachability of 'Amulet_OneTrueKingSigil' could not be determined."]
 }

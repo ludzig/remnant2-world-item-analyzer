@@ -1,8 +1,8 @@
-"""Datenmodell der Analyse.
+"""Data model of the analysis.
 
-Bewusst reines Python ohne PyGObject: so laesst sich die gesamte Auswertung
-ohne GTK testen. Die GObject-Huellen fuer die Listenmodelle sitzen in
-:mod:`r2wa.gobjects` und halten nur eine Referenz auf diese Objekte.
+Deliberately plain Python without PyGObject: this way the whole evaluation
+can be tested without GTK. The GObject wrappers for the list models live in
+:mod:`r2wa.gobjects` and only hold a reference to these objects.
 """
 
 from __future__ import annotations
@@ -12,9 +12,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-#: Anzeigereihenfolge der Kategorien. Was hier nicht steht, wird alphabetisch
-#: hinten angehaengt - so faellt eine neue Kategorie aus einem DLC auf, statt
-#: unterzugehen.
+#: Display order of the categories. Anything not listed here is appended
+#: alphabetically at the end - that way a new category from a DLC stands out
+#: instead of getting lost.
 CATEGORY_ORDER = (
     "weapon",
     "mod",
@@ -32,33 +32,33 @@ CATEGORY_ORDER = (
     "dream",
 )
 
-#: Deutsche Bezeichner der Kategorien. Item-Namen selbst bleiben englisch,
-#: das sind die Begriffe aus dem Spiel.
+#: Display labels of the categories. Item names themselves stay as-is,
+#: those are the terms from the game.
 CATEGORY_LABELS = {
-    "weapon": "Waffen",
+    "weapon": "Weapons",
     "mod": "Mods",
-    "mutator": "Mutatoren",
-    "ring": "Ringe",
-    "amulet": "Amulette",
-    "armor": "Rüstung",
-    "relic": "Relikte",
-    "fragment": "Reliktsplitter",
-    "trait": "Eigenschaften",
-    "engram": "Engramme",
-    "prism": "Prismen",
-    "concoction": "Gebräue",
-    "consumable": "Verbrauchbares",
-    "dream": "Träume",
+    "mutator": "Mutators",
+    "ring": "Rings",
+    "amulet": "Amulets",
+    "armor": "Armor",
+    "relic": "Relics",
+    "fragment": "Relic Fragments",
+    "trait": "Traits",
+    "engram": "Engrams",
+    "prism": "Prisms",
+    "concoction": "Concoctions",
+    "consumable": "Consumables",
+    "dream": "Dreams",
 }
 
 
 def category_label(category: str) -> str:
-    """Deutscher Anzeigename einer Kategorie, sonst die Rohbezeichnung."""
+    """Display label of a category, otherwise the raw name."""
     return CATEGORY_LABELS.get(category, category.capitalize())
 
 
 def category_sort_key(category: str) -> tuple[int, str]:
-    """Sortierschluessel gemaess :data:`CATEGORY_ORDER`."""
+    """Sort key according to :data:`CATEGORY_ORDER`."""
     try:
         return (CATEGORY_ORDER.index(category), "")
     except ValueError:
@@ -67,7 +67,7 @@ def category_sort_key(category: str) -> tuple[int, str]:
 
 @dataclass(frozen=True, slots=True)
 class CatalogItem:
-    """Stammdaten eines sammelbaren Items, unabhaengig vom Charakter."""
+    """Master data of a collectible item, independent of the character."""
 
     id: str
     name: str
@@ -99,7 +99,7 @@ class CatalogItem:
 
     @property
     def source(self) -> str:
-        """Kurze Herkunftsangabe, z.B. ``Vendor: Reggie``."""
+        """Short origin note, e.g. ``Vendor: Reggie``."""
         if self.drop_type and self.drop_reference:
             return f"{self.drop_type}: {self.drop_reference}"
         return self.drop_type or self.drop_reference or ""
@@ -107,7 +107,7 @@ class CatalogItem:
 
 @dataclass(frozen=True, slots=True)
 class ItemState:
-    """Besitzstand eines Items bei einem Charakter."""
+    """Ownership status of an item for one character."""
 
     id: str
     acquired: bool = False
@@ -133,13 +133,13 @@ class ItemState:
 
     @property
     def obtainable_now(self) -> bool:
-        """Ob das Item in einer der aktuell gerollten Welten erreichbar ist."""
+        """Whether the item is reachable in one of the currently rolled worlds."""
         return bool(self.obtainable_in_campaign or self.obtainable_in_adventure)
 
 
 @dataclass(frozen=True, slots=True)
 class Item:
-    """Stammdaten und Besitzstand zusammengefuehrt - die Sicht der Oberflaeche."""
+    """Master data and ownership status combined - the view the UI works with."""
 
     catalog: CatalogItem
     state: ItemState
@@ -166,7 +166,7 @@ class Item:
 
     @property
     def search_text(self) -> str:
-        """Vorberechneter Suchindex - die Suche laeuft ueber jede Zeile."""
+        """Precomputed search index - search runs over every row."""
         parts = [self.catalog.name, self.catalog.category]
         if self.catalog.subcategory:
             parts.append(self.catalog.subcategory)
@@ -261,7 +261,7 @@ class LootGroup:
 
     @property
     def label(self) -> str:
-        return self.name or self.event_drop_reference or self.type or "Fundstelle"
+        return self.name or self.event_drop_reference or self.type or "Loot Location"
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,7 +303,7 @@ class Location:
 
     @property
     def open_item_count(self) -> int:
-        """Anzahl noch nicht eingesammelter Items an diesem Ort."""
+        """Number of items at this location not yet collected."""
         return sum(1 for item in self.items if not item.is_looted)
 
 
@@ -350,7 +350,7 @@ class World:
 
     @property
     def label(self) -> str:
-        return "Kampagne" if self.slot == "campaign" else "Abenteuer"
+        return "Campaign" if self.slot == "campaign" else "Adventure"
 
 
 @dataclass(frozen=True, slots=True)
@@ -371,13 +371,24 @@ class Character:
     items: tuple[Item, ...] = ()
     worlds: tuple[World, ...] = ()
 
+    @property
+    def display_power_level(self) -> int:
+        """Power level as the game's own HUD shows it.
+
+        The save file's raw ``PowerLevel`` is consistently one lower than
+        what Remnant 2 displays in-game (a quirk of the game's own save
+        format, confirmed against the live HUD - not something the parser
+        or this app introduces).
+        """
+        return self.power_level + 1
+
     @classmethod
     def from_json(cls, data: Mapping[str, Any], catalog: Mapping[str, CatalogItem]) -> Character:
         items = []
         for raw in data.get("item_states", ()):
             entry = catalog.get(raw["id"])
-            # Ein Zustand ohne Katalogeintrag kann nur bei einem Schema-Bruch
-            # auftreten; ihn zu ueberspringen ist besser als abzustuerzen.
+            # A state without a catalog entry can only happen on a schema
+            # break; skipping it is better than crashing.
             if entry is not None:
                 items.append(Item(catalog=entry, state=ItemState.from_json(raw)))
 
@@ -401,7 +412,7 @@ class Character:
 
     @property
     def title(self) -> str:
-        """Anzeigename in der Seitenleiste."""
+        """Display name in the sidebar."""
         classes = [c for c in (self.archetype, self.secondary_archetype) if c]
         return " / ".join(classes) if classes else f"Slot {self.index + 1}"
 
@@ -411,7 +422,7 @@ class Character:
 
 @dataclass(frozen=True, slots=True)
 class Analysis:
-    """Vollstaendiges Ergebnis eines Parser-Laufs."""
+    """Full result of a parser run."""
 
     schema_version: int
     save_dir: str
@@ -446,12 +457,12 @@ class Analysis:
         )
 
     def aggregate_items(self) -> tuple[Item, ...]:
-        """Sammelstand ueber alle Charaktere hinweg.
+        """Combined collection status across all characters.
 
-        Items in Remnant 2 haengen ueberwiegend am Charakter; fuer die Frage
-        "habe ich das ueberhaupt schon einmal gefunden" zaehlt aber der
-        Account. Ein Item gilt hier als gefunden, sobald irgendein Charakter
-        es besitzt.
+        In Remnant 2 most items belong to the character; but for the
+        question "have I ever found this at all" the account is what
+        counts. An item counts as found here as soon as any character
+        owns it.
         """
         best: dict[str, Item] = {}
         for character in self.characters:
@@ -468,12 +479,12 @@ class Analysis:
         )
 
     def aggregate_counts(self) -> Counts:
-        """Zaehler passend zu :meth:`aggregate_items`."""
+        """Counts matching :meth:`aggregate_items`."""
         return counts_for(self.aggregate_items())
 
 
 def counts_for(items: Iterable[Item]) -> Counts:
-    """Berechne Zaehler ueber eine beliebige Item-Auswahl."""
+    """Compute counts over an arbitrary item selection."""
     items = list(items)
     per_category: dict[str, list[int]] = {}
     for item in items:
@@ -496,12 +507,12 @@ def counts_for(items: Iterable[Item]) -> Counts:
 
 
 def sort_items(items: Iterable[Item]) -> list[Item]:
-    """Sortiere nach Anzeigereihenfolge der Kategorie, dann nach Name."""
+    """Sort by category display order, then by name."""
     return sorted(items, key=lambda i: (category_sort_key(i.category), i.name.casefold()))
 
 
 def group_by_category(items: Sequence[Item]) -> list[tuple[str, list[Item]]]:
-    """Gruppiere Items nach Kategorie in Anzeigereihenfolge."""
+    """Group items by category in display order."""
     groups: dict[str, list[Item]] = {}
     for item in items:
         groups.setdefault(item.category, []).append(item)
