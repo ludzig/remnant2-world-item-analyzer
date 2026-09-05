@@ -1,4 +1,4 @@
-"""Tests der dateibasierten Einstellungen."""
+"""Tests of the file-based settings."""
 
 from __future__ import annotations
 
@@ -22,6 +22,16 @@ class TestSettings:
         assert loaded.save_dir == "/saves/123"
         assert loaded.character_index == 2
 
+    def test_fenstergroesse_und_maximiert_werden_gemerkt(self, tmp_path: Path) -> None:
+        target = tmp_path / "settings.json"
+        Settings(window_width=1280, window_height=800, window_maximized=True).save(target)
+
+        loaded = Settings.load(target)
+
+        assert loaded.window_width == 1280
+        assert loaded.window_height == 800
+        assert loaded.window_maximized is True
+
     def test_legt_verzeichnis_an(self, tmp_path: Path) -> None:
         target = tmp_path / "tief" / "verschachtelt" / "settings.json"
         Settings(save_dir="/x").save(target)
@@ -33,6 +43,9 @@ class TestSettings:
 
         assert loaded.save_dir is None
         assert loaded.character_index is None
+        assert loaded.window_width is None
+        assert loaded.window_height is None
+        assert loaded.window_maximized is False
 
     def test_kaputte_datei_wird_ignoriert(self, tmp_path: Path) -> None:
         target = tmp_path / "settings.json"
@@ -62,8 +75,8 @@ class TestSettings:
         assert [p.name for p in tmp_path.iterdir()] == ["settings.json"]
 
     def test_nicht_schreibbares_ziel_wirft_nicht(self, tmp_path: Path) -> None:
-        # Ein Verzeichnis anstelle der Datei laesst das Schreiben scheitern;
-        # die Anwendung darf daran nicht sterben.
+        # A directory in place of the file makes writing fail; the
+        # application must not die from that.
         target = tmp_path / "settings.json"
         target.mkdir()
 
@@ -85,8 +98,8 @@ class TestConfigDir:
         assert config_dir() == tmp_path / ".config" / "r2wa"
 
     def test_ohne_home_kein_verzeichnis(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Ohne bestimmbares Home gibt es keinen Speicherort - das darf keine
-        # Ausnahme werfen, sondern muss None liefern.
+        # Without a determinable home there is no place to save - that must
+        # not raise an exception, but return None.
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         monkeypatch.delenv("HOME", raising=False)
         monkeypatch.delenv("USERPROFILE", raising=False)
@@ -118,7 +131,7 @@ class TestUserHome:
 
 
 class TestEinstellungenOhneHome:
-    """Ohne Speicherort muss die Anwendung trotzdem starten koennen."""
+    """Without a place to save, the application must still be able to start."""
 
     def test_laden_liefert_voreinstellung(self, monkeypatch: pytest.MonkeyPatch) -> None:
         _remove_home(monkeypatch)
