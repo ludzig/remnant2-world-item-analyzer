@@ -1,56 +1,69 @@
 # r2wa — Remnant 2 World & Item Analyzer
 
-Eine GNOME-Anwendung, die Remnant-2-Savegames **ausschließlich liest** und
-anzeigt, welche Items ein Charakter gefunden hat und welche ihm noch fehlen —
-dazu die aktuell gerollten Welten mit Zonen, Orten und Fundstellen.
+A GNOME application that **only reads** Remnant 2 save games and shows which
+items a character has found and which are still missing — plus the
+currently rolled worlds with their zones, locations, and loot spots.
 
-Kein Backup, kein Speichern, kein Eingriff ins Savegame.
+No backups, no saving, no touching the save game.
 
-## Aufbau
+## Architecture
 
-Der Savegame-Parser existiert nur als C#-Bibliothek. Statt ihn nachzubauen
-wird er als schlanker Subprozess eingebunden:
+The save game parser only exists as a C# library. Instead of reimplementing
+it, it's embedded as a lightweight subprocess:
 
 ```
 ┌──────────────────────────────────────────┐
 │ r2wa  —  Python + GTK4 / libadwaita      │
-│   ├ discovery.py    Proton-Prefix finden │
-│   ├ parser_bridge   Subprozess + JSON    │
-│   ├ models.py       reine Dataclasses    │
-│   └ views/          Items · Welten       │
+│   ├ discovery.py    find the Proton prefix │
+│   ├ parser_bridge   subprocess + JSON    │
+│   ├ models.py       plain dataclasses    │
+│   └ views/          items · worlds       │
 └─────────────────┬────────────────────────┘
-                  │ JSON auf stdout (Schema v1)
+                  │ JSON on stdout (schema v1)
 ┌─────────────────▼────────────────────────┐
 │ r2wa-parser  —  C# .NET 10               │
 │   └ lib.remnant2.analyzer (MIT)          │
-│       └ db.json — alle 849 Items         │
+│       └ db.json — all 849 items          │
 └──────────────────────────────────────────┘
 ```
 
-Der Parser gibt **nicht** das Datenmodell der Bibliothek roh aus, sondern ein
-eigenes, versioniertes Schema. Ändert sich stromaufwärts etwas, bleibt die
-Anpassung auf `parser/DatasetMapper.cs` beschränkt.
+The parser does **not** emit the library's data model raw, but its own,
+versioned schema. If something changes upstream, the fix stays confined to
+`parser/DatasetMapper.cs`.
 
-## Voraussetzungen
+### Where an item comes from
 
-- GNOME 46 oder neuer (GTK 4.12+, libadwaita 1.5+)
-- Python 3.11+ mit PyGObject — unter Fedora `python3-gobject`,
-  unter Debian/Ubuntu `python3-gi python3-gi-cairo gir1.2-adw-1`
-- .NET SDK 10 zum Bauen des Parsers
-- [just](https://github.com/casey/just) für die Buildaufgaben (optional)
+The catalog carries a note for 839 of the 849 items saying where and how to
+get them ("Found in an outdoor location on Yaesha. There will be a big Doe
+statue. Wear the Red Doe Sigil amulet to open"). Both views show it under
+the item name, over at most two lines so the rows stay an even height, with
+the full text on the row's tooltip.
 
-## Erster Start auf der Linux-Maschine
+A location's loot names only the item, so the worlds view joins it against
+the catalog by id — which is why `WorldsView.set_analysis()` takes the whole
+analysis and not just the character.
+
+## Requirements
+
+- GNOME 46 or newer (GTK 4.12+, libadwaita 1.5+)
+- Python 3.11+ with PyGObject — `python3-gobject` on Fedora,
+  `python3-gi python3-gi-cairo gir1.2-adw-1` on Debian/Ubuntu
+- .NET SDK 10 to build the parser
+- [just](https://github.com/casey/just) for the build tasks (optional)
+
+## First start on the Linux machine
 
 ```bash
 just build-parser && just smoke && just run
 ```
 
-Die drei Schritte bauen den Parser für `linux-x64`, prüfen die Oberfläche
-(18 Selbsttests über Filter, Suche, Baum und Charakterwechsel) und starten
-dann die Anwendung. Geht `just smoke` durch, funktioniert die GTK-Schicht;
-scheitert `just run` danach trotzdem, liegt es an der Savegame-Suche.
+These three steps build the parser for `linux-x64`, check the UI (18
+self-tests covering filters, search, the tree, and character switching),
+and then start the application. If `just smoke` passes, the GTK layer
+works; if `just run` still fails afterward, the problem is in the save
+game search.
 
-Ohne `just`:
+Without `just`:
 
 ```bash
 dotnet publish parser/R2waParser.csproj -c Release -r linux-x64 \
@@ -59,107 +72,134 @@ PYTHONPATH=src python3 tests/smoke_ui.py
 PYTHONPATH=src python3 -m r2wa.main
 ```
 
-### Ordner von Windows übertragen
+### Transferring the folder from Windows
 
-Das Arbeitsverzeichnis lässt sich direkt kopieren, alle Dateien haben
-LF-Zeilenenden. Nicht mitnehmen — beziehungsweise vorher `just clean`:
+The working directory can be copied directly, all files use LF line
+endings. Don't bring these along — or run `just clean` first:
 
-| Verzeichnis | warum |
+| Directory | why |
 |---|---|
-| `build/`, `parser/bin/`, `parser/obj/` | enthalten das Windows-Binary, wird neu gebaut |
-| `.venv/` | Windows-Interpreter, unter Linux unbrauchbar |
-| `__pycache__/` | plattformabhängig |
+| `build/`, `parser/bin/`, `parser/obj/` | contain the Windows binary, gets rebuilt |
+| `.venv/` | Windows interpreter, useless on Linux |
+| `__pycache__/` | platform-dependent |
 
-PyGObject kommt unter GNOME aus der Distribution und gehört **nicht** in ein
-venv — die Anwendung läuft direkt mit dem System-Python.
+On GNOME, PyGObject comes from the distribution and **does not** belong in
+a venv — the application runs directly against the system Python.
 
-Das Savegame wird automatisch gesucht. Ein abweichender Pfad lässt sich als
-Argument übergeben oder im Fenster über *Ordner öffnen…* wählen:
+The save game is found automatically. A different path can be passed as an
+argument or chosen in the window via *Open Folder…*:
 
 ```bash
-PYTHONPATH=src python3 -m r2wa.main ~/pfad/zum/savegame
+PYTHONPATH=src python3 -m r2wa.main ~/path/to/savegame
 ```
 
-### Wo die Savegames liegen
+### Where the save games live
 
-Unter Linux im Proton-Prefix des Spiels (App-ID 1282100):
+On Linux, inside the game's Proton prefix (app ID 1282100):
 
 ```
 ~/.steam/steam/steamapps/compatdata/1282100/pfx/drive_c/users/steamuser/
     Saved Games/Remnant2/Steam/<steam-id>/
 ```
 
-`discovery.py` sucht zusätzlich in `~/.local/share/Steam`, in der
-Flatpak-Installation von Steam und in allen Bibliotheken aus
-`libraryfolders.vdf`. Was gefunden wurde, zeigt:
+`discovery.py` also searches `~/.local/share/Steam`, the Flatpak
+installation of Steam, and every library listed in `libraryfolders.vdf`.
+To see what was found:
 
 ```bash
 just discover
 ```
 
-## Entwicklung
+## Development
 
-Entwickelt wird unter Windows, gebaut und getestet auf einer Linux-Maschine:
+Developed on Windows, built and tested on a Linux machine:
 
 ```bash
-export R2WA_REMOTE=benutzer@rechner:~/dev/r2wa
+export R2WA_REMOTE=user@host:~/dev/r2wa
 just sync
 ```
 
-Der C#-Teil ist auch unter Windows baubar und für `linux-x64`
-cross-publishbar; die GTK-Oberfläche braucht Linux.
+The C# part also builds on Windows and cross-publishes for `linux-x64`;
+the GTK UI needs Linux.
 
 ```bash
 just test     # pytest
 just lint     # ruff
-just check    # beides
-just smoke    # Oberflaeche wirklich aufbauen und pruefen
+just check    # both
+just smoke    # actually build and check the UI
 ```
 
-`just smoke` baut die Ansichten auf, hängt sie in ein Fenster, lässt den
-Main-Loop laufen und prüft Filter, Suche, Aufklappen und Charakterwechsel.
-Das braucht PyGObject und eine Anzeige und läuft deshalb nicht unter
-`just test`. Mit `--show` bleibt das Fenster zum Ansehen offen, mit
-`--save-dir` läuft es gegen ein echtes Savegame statt gegen das Fixture.
+`just smoke` builds the views, hangs them in a window, runs the main loop,
+and checks filters, search, expanding, and character switching. That needs
+PyGObject and a display, so it doesn't run under `just test`. With `--show`
+the window stays open to look at; with `--save-dir` it runs against a real
+save game instead of the fixture.
 
-Die Datenschicht (`models.py`, `parser_bridge.py`, `discovery.py`) kommt ohne
-PyGObject aus und ist deshalb auf jeder Plattform testbar. Für den
-Integrationstest gegen ein echtes Savegame:
+The data layer (`models.py`, `parser_bridge.py`, `discovery.py`) doesn't
+need PyGObject and is therefore testable on any platform. For the
+integration test against a real save game:
 
 ```bash
-R2WA_TEST_SAVE_DIR=/pfad/zum/savegame just test
+R2WA_TEST_SAVE_DIR=/path/to/savegame just test
 ```
 
-### Nützliche Umgebungsvariablen
+### Useful environment variables
 
-| Variable | Wirkung |
+| Variable | Effect |
 |---|---|
-| `R2WA_PARSER` | Pfad zum Parser-Binary, überschreibt die Suche |
-| `R2WA_SAVE_DIR` | Zusätzliche Savegame-Pfade für `just discover` |
-| `R2WA_TEST_SAVE_DIR` | Aktiviert den Integrationstest |
+| `R2WA_PARSER` | Path to the parser binary, overrides the search |
+| `R2WA_SAVE_DIR` | Additional save game paths for `just discover` |
+| `R2WA_TEST_SAVE_DIR` | Enables the integration test |
 
-### Der Parser als eigenständiges Werkzeug
+### The parser as a standalone tool
 
 ```bash
-build/parser/r2wa-parser analyze --save-dir <pfad> --pretty
-build/parser/r2wa-parser catalog --pretty    # Item-Katalog ohne Savegame
+build/parser/r2wa-parser analyze --save-dir <path> --pretty
+build/parser/r2wa-parser catalog --pretty    # item catalog without a save game
 build/parser/r2wa-parser version
 ```
 
-Auf stdout liegt ausschließlich JSON. Im Fehlerfall ein
-`{"error":{"kind":…,"message":…}}` mit Exit-Code 1.
+stdout carries nothing but JSON. On failure, a
+`{"error":{"kind":…,"message":…}}` with exit code 1.
 
-## Ausblick
+## Item icons and portraits
 
-Als Nächstes sollen die Items mit **Bildern** dargestellt werden. Die Zuordnung
-kommt aus einer XML-Datei, die noch beizusteuern ist. Anzuknüpfen wäre sie an
-`CatalogItem.id` in [models.py](src/r2wa/models.py) — die Kennung ist über den
-ganzen Katalog eindeutig und stammt direkt aus `db.json`, taugt also als
-stabiler Schlüssel. In der Liste würde das Bild an die Stelle des
-Häkchen-Symbols in `_setup_row` von [views/items.py](src/r2wa/views/items.py)
-treten, der Fundstatus dann über einen Rahmen oder ein Overlay.
+The items list shows an icon per item where one is available. Icons are
+matched via `data/iteminfo.csv` (a Remnant2Toolkit export: item name,
+category, and a link to the matching page on the Remnant wiki, wiki.gg) —
+`src/r2wa/iteminfo.py` matches a catalog item to its CSV row (the internal
+catalog ID and the CSV name don't always agree, so the match normalizes
+both sides and compares), and derives the wiki image path from the page
+name.
 
-## Lizenz
+The actual image files are not fetched at UI runtime; `just fetch-icons`
+(or automatically as part of `just build-parser`) downloads them once into
+`build/icons/` (gitignored, like the parser binary). `src/r2wa/icons.py`
+then only does a local file lookup — showing items never depends on a
+network connection.
 
-MIT — siehe [LICENSE](LICENSE). Zu den eingebundenen Fremdkomponenten siehe
+Three sources fill in what the CSV export doesn't cover, in this order:
+hand-picked files in `data/manual_icons/` (for items whose image filename
+can't be derived — a slash in the page title, a typo in the link, or a quest
+item that appears in no export at all), then the wiki, then Remnant2Toolkit's
+CDN for the individual relic fragments and prisms, which the wiki only has
+colour-coded placeholders for.
+
+Loot groups get the same treatment in the worlds view: a group headed by a
+vendor, a boss or a miniboss shows that character's portrait. Their filenames
+on the wiki can't be derived either — "Reggie" is filed under
+`Reginald_Reggie_Malone.jpg`, "Nightweaver" under `The_Nightweaver.jpg` — so
+`data/portraits.csv` maps the name the save writes to the file to fetch and
+to the wiki page, and the heading gets the same link button the items have.
+The group type decides whether either is looked up at all, so a location that
+happens to share a boss's name can't pick up that boss's picture.
+
+The page is not derivable either: the save's "Norah" is "Dr. Norah" on the
+wiki, "Blood Moon Altar" is "Bloodmoon Altar", and the database's own
+"Gwentdil The Unburnt" is a typo for "Gwendil: The Unburnt". Every one of
+the 46 entries was checked against the wiki's API rather than guessed.
+
+## License
+
+MIT — see [LICENSE](LICENSE). For the third-party components used, see
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
