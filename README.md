@@ -211,6 +211,32 @@ wiki, "Blood Moon Altar" is "Bloodmoon Altar", and the database's own
 "Gwentdil The Unburnt" is a typo for "Gwendil: The Unburnt". Every one of
 the 46 entries was checked against the wiki's API rather than guessed.
 
+## Flatpak
+
+`just flatpak` builds the application into a Flatpak and installs it for the
+current user; `just flatpak-bundle` additionally writes `r2wa.flatpak`, a
+single file that someone else installs with
+
+```
+flatpak install --user ./r2wa.flatpak
+```
+
+That is the point of it: the recipient needs neither a .NET SDK nor
+PyGObject, only Flatpak itself. Build the parser and fetch the icons first
+(`just build-parser`) — the manifest copies both in rather than building or
+downloading them.
+
+The sandbox gets read-only access to the three directories Steam installs
+itself into, and no network at all. A Steam library on another drive is
+reached through the file chooser, which grants access to exactly the
+directory the user picks.
+
+**Not yet ready for Flathub.** Two things would have to be solved first: the
+parser is built outside the manifest, because the .NET 10 SDK is not
+available as a Flatpak extension, and the item pictures are copied into the
+bundle instead of being built from source. See the comments in
+`packaging/io.github.ludzig.R2wa.yml`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). For the third-party components used, see

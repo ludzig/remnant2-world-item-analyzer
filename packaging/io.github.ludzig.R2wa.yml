@@ -1,0 +1,64 @@
+# Flatpak manifest for a locally built bundle.
+#
+#   just flatpak          builds and installs it for the current user
+#   just flatpak-bundle   writes r2wa.flatpak, a single file to hand over
+#
+# Deliberately not yet a Flathub submission - two things stand in the way,
+# both noted where they occur below: the parser binary is built outside
+# this manifest, and the item pictures are copied in rather than fetched.
+app-id: io.github.ludzig.R2wa
+runtime: org.gnome.Platform
+runtime-version: "49"
+sdk: org.gnome.Sdk
+command: r2wa
+
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+
+  # Save games live in the game's Proton prefix. Read-only, and only the
+  # three places Steam actually installs itself - a library folder on
+  # another drive is reached through the file chooser instead, which grants
+  # access to exactly the directory the user picked.
+  - --filesystem=~/.steam:ro
+  - --filesystem=~/.local/share/Steam:ro
+  - --filesystem=~/.var/app/com.valvesoftware.Steam:ro
+
+  # No --share=network on purpose: everything the application shows is
+  # either in the bundle or in the save game. It never phones home.
+
+modules:
+  - name: r2wa
+    buildsystem: simple
+    build-commands:
+      # The application itself. No pip install: the only dependency is
+      # PyGObject, and that comes from the runtime - a pip build of it
+      # would need the full GTK headers and is exactly what we avoid.
+      - install -d /app/lib/r2wa
+      - cp -r src/r2wa /app/lib/r2wa/
+      - install -Dm755 packaging/r2wa-launcher.sh /app/bin/r2wa
+
+      # The tables the application matches items against, plus the
+      # hand-picked icons. Found at runtime via /app/share/r2wa - see
+      # src/r2wa/paths.py.
+      - install -d /app/share/r2wa/data
+      - cp -r data/*.csv data/manual_icons /app/share/r2wa/data/
+
+      # The item pictures. Copied in rather than downloaded: the sandbox
+      # has no network, and a first start that fetches 888 files would be
+      # a poor welcome. See THIRD-PARTY-NOTICES.md for their licence.
+      - install -d /app/share/r2wa/icons
+      - cp -r build/icons/. /app/share/r2wa/icons/
+
+      # The save game parser. Built beforehand by `just build-parser`,
+      # because the .NET 10 SDK is not available as a Flatpak extension -
+      # this is the part that a Flathub submission would have to solve.
+      - install -Dm755 build/parser/r2wa-parser /app/bin/r2wa-parser
+
+      - install -Dm644 data/io.github.ludzig.R2wa.desktop /app/share/applications/io.github.ludzig.R2wa.desktop
+      - install -Dm644 data/icons/io.github.ludzig.R2wa.svg /app/share/icons/hicolor/scalable/apps/io.github.ludzig.R2wa.svg
+    sources:
+      - type: dir
+        path: ..

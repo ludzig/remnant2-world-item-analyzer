@@ -15,6 +15,7 @@ venv/
 # Build output
 build/
 dist/
+r2wa.flatpak
 src/r2wa/ui/*.ui
 
 # Editor

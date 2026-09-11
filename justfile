@@ -6,6 +6,7 @@
 #   export R2WA_REMOTE=user@steamdeck:~/dev/r2wa
 
 remote := env_var_or_default("R2WA_REMOTE", "")
+app_id := "io.github.ludzig.R2wa"
 parser_out := "build/parser"
 parser_bin := parser_out / "r2wa-parser"
 
@@ -40,6 +41,20 @@ analyze dir:
 # Download all item icons and vendor/boss portraits from the Remnant wiki once (cached in build/icons, skips what's already there).
 fetch-icons:
     PYTHONPATH=src python3 -m r2wa.icon_fetch
+
+# --- Flatpak ----------------------------------------------------------------
+
+# Build and install the Flatpak for the current user.
+# Needs the parser and the icons beforehand: `just build-parser`.
+flatpak:
+    flatpak run org.flatpak.Builder --force-clean --user --install \
+        build/flatpak packaging/io.github.ludzig.R2wa.yml
+
+# Write r2wa.flatpak - one file to hand to someone else.
+# They install it with: flatpak install --user ./r2wa.flatpak
+flatpak-bundle: flatpak
+    flatpak build-bundle --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+        ~/.local/share/flatpak/repo r2wa.flatpak {{app_id}}
 
 # --- Quality ----------------------------------------------------------------
 
