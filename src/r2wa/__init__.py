@@ -6,4 +6,4 @@ __version__ = "0.1.0"
 #: Must match SchemaVersion in parser/Contract/AnalysisResult.cs.
 SCHEMA_VERSION = 1
 
-APP_ID = "de.optimal_systems.R2wa"
+APP_ID = "io.github.ludzig.R2wa"

@@ -6,6 +6,6 @@ Comment=Shows found and missing items, plus the currently rolled worlds
 Categories=Game;Utility;
 Keywords=Remnant;Savegame;Items;
 Exec=r2wa %f
-Icon=de.optimal_systems.R2wa
+Icon=io.github.ludzig.R2wa
 Terminal=false
 StartupNotify=true
