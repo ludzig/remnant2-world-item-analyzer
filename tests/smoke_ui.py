@@ -164,6 +164,27 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
         f"every row has a real name, not an internal id ({len(raw_named)} raw: {raw_named[:3]})",
     )
 
+    # "Reroll needed" must not be claimed where reachability is merely
+    # undecided - the analyzer gives up on a few items with prerequisites.
+    undecided = [
+        i
+        for i in character.items
+        if not i.acquired
+        and any(
+            character.world(slot) is not None and obtainable is None
+            for slot, obtainable in (
+                ("campaign", i.state.obtainable_in_campaign),
+                ("adventure", i.state.obtainable_in_adventure),
+            )
+        )
+    ]
+    if undecided:
+        labels = [label for label, _ in items_view._badges_for(undecided[0])]
+        check(
+            "Reachability unknown" in labels and "Reroll needed" not in labels,
+            f"undecided reachability says so instead of 'Reroll needed' ({labels})",
+        )
+
     # Search
     sample = next((i for i in character.items if i.name and " " in i.name), character.items[0])
     needle = sample.name.split(" ")[0]

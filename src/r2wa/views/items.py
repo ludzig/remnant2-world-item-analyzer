@@ -236,12 +236,28 @@ class ItemsView(Gtk.Box):
         # Reachability only matters for missing items, and only carries
         # meaning when a specific character is selected - the worlds belong
         # to the character, not the account.
-        if self._scope is Scope.CHARACTER:
-            if item.state.obtainable_in_campaign:
+        if self._scope is Scope.CHARACTER and self._character is not None:
+            state = item.state
+            if state.obtainable_in_campaign:
                 badges.append(("Campaign", "success"))
-            if item.state.obtainable_in_adventure:
+            if state.obtainable_in_adventure:
                 badges.append(("Adventure", "success"))
-            if not item.state.obtainable_now:
+
+            # `None` means two different things: the slot has no rolled world
+            # at all, or the analyzer could not decide (it gives up on a few
+            # items with several prerequisites). Only the second is
+            # "unknown" - and "Reroll needed" would claim a reroll helps,
+            # which is precisely what we do not know.
+            undecided = any(
+                self._character.world(slot) is not None and obtainable is None
+                for slot, obtainable in (
+                    ("campaign", state.obtainable_in_campaign),
+                    ("adventure", state.obtainable_in_adventure),
+                )
+            )
+            if undecided:
+                badges.append(("Reachability unknown", "dim-label"))
+            elif not state.obtainable_now:
                 badges.append(("Reroll needed", "warning"))
 
         if item.catalog.coop_only:

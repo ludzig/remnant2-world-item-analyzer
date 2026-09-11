@@ -35,7 +35,7 @@ public static class DatasetMapper
         {
             try
             {
-                characters.Add(MapCharacter(character, catalog, catalogIds, warnings));
+                characters.Add(MapCharacter(character, catalog, catalogIds));
             }
             catch (Exception ex)
             {
@@ -59,12 +59,11 @@ public static class DatasetMapper
     private static CharacterDto MapCharacter(
         Character character,
         List<CatalogItemDto> catalog,
-        List<string> catalogIds,
-        List<string> warnings)
+        List<string> catalogIds)
     {
         var profile = character.Profile;
         var save = character.Save;
-        var states = MapItemStates(character, catalogIds, warnings);
+        var states = MapItemStates(character, catalogIds);
 
         return new CharacterDto
         {
@@ -105,7 +104,7 @@ public static class DatasetMapper
     /// </para>
     /// </remarks>
     private static List<ItemStateDto> MapItemStates(
-        Character character, List<string> catalogIds, List<string> warnings)
+        Character character, List<string> catalogIds)
     {
         var owned = new Dictionary<string, InventoryItem>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in character.Profile.Inventory)
@@ -132,7 +131,7 @@ public static class DatasetMapper
                 continue;
             }
 
-            var (campaign, adventure) = Obtainable(character, id, warnings);
+            var (campaign, adventure) = Obtainable(character, id);
             states.Add(new ItemStateDto
             {
                 Id = id,
@@ -150,30 +149,35 @@ public static class DatasetMapper
     /// rolled worlds.
     /// </summary>
     /// <remarks>
-    /// <c>RolledWorld.CanGetItem</c> throws an InvalidOperationException for
-    /// certain items with prerequisites (an upstream bug in
-    /// CheckPrerequisites, observed for Amulet_OneTrueKingSigil). This must
-    /// not abort the analysis - such items are reported as "unknown" and
-    /// recorded as a warning.
+    /// <c>RolledWorld.CanGetItem</c> throws for items whose prerequisite the
+    /// analyzer cannot resolve in the rolled world:
+    /// <c>CheckPrerequisites</c> looks the prerequisite up with
+    /// <c>Single()</c> and has nothing to match. Observed for
+    /// <c>Amulet_OneTrueKingSigil</c>, whose two prerequisites are the
+    /// sigils of Faelin and Faerin - the two bosses of Losomn that never
+    /// both appear in one roll.
+    ///
+    /// This must not abort the analysis. <c>null</c> is returned, which is
+    /// the same "we do not know" the caller already uses for a slot with no
+    /// rolled world, and the item list shows it as such. Deliberately not a
+    /// warning: it says nothing about the save game and there is nothing
+    /// the player could do about it, so a banner on every load would be
+    /// noise.
     /// </remarks>
-    private static (bool? Campaign, bool? Adventure) Obtainable(
-        Character character, string id, List<string> warnings)
+    private static (bool? Campaign, bool? Adventure) Obtainable(Character character, string id)
     {
-        return (Check(character.Save?.Campaign, "campaign"),
-                Check(character.Save?.Adventure, "adventure"));
+        return (Check(character.Save?.Campaign),
+                Check(character.Save?.Adventure));
 
-        bool? Check(RolledWorld? world, string label)
+        bool? Check(RolledWorld? world)
         {
             if (world is null) return null;
             try
             {
                 return world.CanGetItem(id);
             }
-            catch (Exception ex)
+            catch (InvalidOperationException)
             {
-                warnings.Add(
-                    $"Slot {character.Index}: reachability of '{id}' in the {label} " +
-                    $"could not be determined ({ex.GetType().Name}).");
                 return null;
             }
         }
