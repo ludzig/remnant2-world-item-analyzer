@@ -99,3 +99,8 @@ found at the sources linked above.
 
 This application is not affiliated with Gunfire Games or Gearbox
 Publishing. Remnant II is a trademark of its respective rights holders.
+
+The application icon in `data/icons/` is our own work and deliberately does
+not imitate the game's logo mark, which is part of that trademark. The item
+pictures the application shows are the wikis' renders, credited above; none
+of the game's own branding is reproduced anywhere.
