@@ -447,6 +447,9 @@ class _CharacterRow(Gtk.ListBoxRow):
             for part in (
                 f"Slot {character.index + 1}",
                 f"Level {character.display_power_level}",
+                # Equal to the sum of the character's trait levels, checked
+                # against the save - it is the number the game itself shows.
+                f"Trait Rank {character.trait_rank}" if character.trait_rank else "",
                 format_playtime(character.playtime_seconds),
             )
             if part
