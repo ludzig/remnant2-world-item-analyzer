@@ -33,6 +33,7 @@ from .iteminfo import (
     build_index,
     load_manual_links,
     load_portraits,
+    prettify_id,
     wiki_page_url,
 )
 
@@ -125,3 +126,20 @@ class IconLookup:
         if entry is None or not entry.wiki_page:
             return None
         return wiki_page_url(entry.wiki_page)
+
+    def display_name_for(self, item: Lookupable) -> str:
+        """The name a player would recognise.
+
+        For a good half of the catalog the analyzer has no display name and
+        puts the internal id in ``name`` instead - every single trait among
+        them. The metadata export is what knows the real one. Where the
+        analyzer does deliver a name it is kept: it comes from the game
+        itself and is the more authoritative spelling of the two.
+        """
+        if item.name != item.id:
+            return item.name
+
+        info = self._index.lookup(item)
+        if info is not None and info.name:
+            return info.name
+        return prettify_id(item.id)

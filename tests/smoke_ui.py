@@ -156,10 +156,24 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
     items_view._on_status_changed(Status.ALL)
     pump()
 
+    # Names: the analyzer leaves the internal id in `name` for a good half
+    # of the catalog, traits for all of them. Nothing may reach a row raw.
+    raw_named = [obj.item.id for obj in items_view._store if obj.display_name == obj.item.id]
+    check(
+        not raw_named,
+        f"every row has a real name, not an internal id ({len(raw_named)} raw: {raw_named[:3]})",
+    )
+
     # Search
     sample = next((i for i in character.items if i.name and " " in i.name), character.items[0])
     needle = sample.name.split(" ")[0]
-    expected = sum(1 for i in character.items if i.matches(needle))
+
+    def would_match(item, text: str) -> bool:
+        """Mirror of ItemsView._match - the raw index plus the shown name."""
+        shown = items_view._display_names.get(item.id, item.name)
+        return item.matches(text) or text.casefold() in shown.casefold()
+
+    expected = sum(1 for i in character.items if would_match(i, needle))
     pump_search(items_view, needle, expected)
     hits = items_view._model.get_n_items()
     check(
@@ -168,6 +182,24 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
         f"needle={items_view._needle!r}, entry={items_view._search.get_text()!r}, "
         f"store={items_view._store.get_n_items()})",
     )
+
+    # A name that only exists after resolving: "Blood Bond" is
+    # `Trait_BloodBond` in the save, so the space finds nothing without it.
+    two_word = next(
+        (
+            items_view._display_names[i.id]
+            for i in character.items
+            if i.name == i.id and " " in items_view._display_names.get(i.id, "")
+        ),
+        None,
+    )
+    if two_word:
+        wanted = sum(1 for i in character.items if would_match(i, two_word))
+        pump_search(items_view, two_word, wanted)
+        check(
+            items_view._model.get_n_items() == wanted and wanted > 0,
+            f"search finds the resolved name {two_word!r}",
+        )
 
     pump_search(items_view, "zzz-does-not-exist-zzz", 0)
     check(items_view._model.get_n_items() == 0, "nonsense search yields nothing")

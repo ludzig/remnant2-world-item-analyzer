@@ -317,3 +317,38 @@ class TestPortraits:
         lookup = _make_lookup(tmp_path, self.CSV, portrait_rows=self.PORTRAITS)
 
         assert lookup.portrait_wiki_url_for("World Drop") is None
+
+
+class TestDisplayName:
+    CSV = [
+        {
+            "id": "x",
+            "name": "Blood Bond",
+            "category": "trait",
+            "wikiLinks": "https://remnant.wiki/Blood_Bond",
+        }
+    ]
+
+    def test_interne_id_wird_zum_echten_namen(self, tmp_path: Path) -> None:
+        # The analyzer delivers no display name for traits - `name` is the id.
+        lookup = _make_lookup(tmp_path, self.CSV)
+
+        item = _item("Trait_BloodBond", "Trait_BloodBond", "trait")
+
+        assert lookup.display_name_for(item) == "Blood Bond"
+
+    def test_name_aus_dem_spiel_hat_vorrang(self, tmp_path: Path) -> None:
+        # Where the analyzer does deliver a name it wins: it comes from the
+        # game, the export is a community transcription of it.
+        lookup = _make_lookup(tmp_path, self.CSV)
+
+        item = _item("Trait_BloodBond", "Blood-Bond", "trait")
+
+        assert lookup.display_name_for(item) == "Blood-Bond"
+
+    def test_unbekanntes_item_faellt_auf_die_id_zurueck(self, tmp_path: Path) -> None:
+        lookup = _make_lookup(tmp_path, self.CSV)
+
+        item = _item("Trait_Unbekannt", "Trait_Unbekannt", "trait")
+
+        assert lookup.display_name_for(item) == "Unbekannt"

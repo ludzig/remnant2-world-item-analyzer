@@ -323,3 +323,18 @@ def test_praefixe_werden_vollstaendig_abgeschnitten(
     item = _item(item_id, item_id, "misc")
 
     assert index.lookup(item) is not None
+
+
+class TestPrettifyId:
+    def test_prefix_faellt_weg_und_camelcase_wird_getrennt(self) -> None:
+        assert iteminfo.prettify_id("Trait_BloodBond") == "Blood Bond"
+
+    def test_mehrfaches_praefix(self) -> None:
+        assert iteminfo.prettify_id("Quest_Item_CrimsonKingCoin") == "Crimson King Coin"
+
+    def test_grossbuchstabenfolge_bleibt_zusammen(self) -> None:
+        # "N'Erudian" and the like must not be torn apart letter by letter.
+        assert iteminfo.prettify_id("Weapon_XMGCarbine") == "XMG Carbine"
+
+    def test_ohne_praefix_bleibt_der_name(self) -> None:
+        assert iteminfo.prettify_id("Amplitude") == "Amplitude"

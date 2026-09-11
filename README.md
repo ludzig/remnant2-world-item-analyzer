@@ -183,6 +183,13 @@ The actual image files are not fetched at UI runtime; `just fetch-icons`
 then only does a local file lookup — showing items never depends on a
 network connection.
 
+The export also supplies the **names**. For roughly 500 of the 849 catalog
+entries the analyzer has no display name and puts the internal id in `name`
+instead — all 40 traits among them, which is why the item list used to read
+`Trait_BloodBond`. Where the analyzer does deliver a name it wins; it comes
+from the game itself. Row title, search and sort order all use the resolved
+name, so they can't drift apart.
+
 Three sources fill in what the CSV export doesn't cover, in this order:
 hand-picked files in `data/manual_icons/` (for items whose image filename
 can't be derived — a slash in the page title, a typo in the link, or a quest

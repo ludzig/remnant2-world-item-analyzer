@@ -20,17 +20,23 @@ from .models import Character, Item, Location, LootItem, Zone  # noqa: E402
 
 
 class ItemObject(GObject.Object):
-    """A collectible item in the item list."""
+    """A collectible item in the item list.
+
+    ``display_name`` is what the row shows, what the search matches and
+    what the list sorts by - all three have to agree, so it is resolved
+    once here rather than in each of the three places.
+    """
 
     __gtype_name__ = "R2waItemObject"
 
-    def __init__(self, item: Item):
+    def __init__(self, item: Item, display_name: str | None = None):
         super().__init__()
         self.item = item
+        self.display_name = display_name or item.name
 
     @GObject.Property(type=str, flags=GObject.ParamFlags.READABLE)
     def name(self) -> str:
-        return self.item.name
+        return self.display_name
 
     @GObject.Property(type=str, flags=GObject.ParamFlags.READABLE)
     def category(self) -> str:

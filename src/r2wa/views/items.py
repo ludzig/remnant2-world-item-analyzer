@@ -61,6 +61,9 @@ class ItemsView(Gtk.Box):
         self._icons = IconLookup()
         self._icon_paths: dict[str, Path] = {}
         self._wiki_urls: dict[str, str] = {}
+        # The analyzer puts the internal id in `name` for a good half of the
+        # catalog, traits included. Resolved once per analysis, not per row.
+        self._display_names: dict[str, str] = {}
 
         # Data chain: store -> filter -> sort with sections.
         # Gtk.SortListModel provides the sections for the category headers
@@ -173,7 +176,7 @@ class ItemsView(Gtk.Box):
         item = obj.item
         row: Adw.ActionRow = list_item.get_child()
 
-        row.set_title(_escape(item.name))
+        row.set_title(_escape(obj.display_name))
         row.set_subtitle(_escape(self._subtitle_for(item)))
         # Notes run to a couple of hundred characters and occasionally to a
         # thousand; two lines keep the rows uniform, the tooltip has the rest.
@@ -273,7 +276,12 @@ class ItemsView(Gtk.Box):
         if self._status is Status.ACQUIRED and not item.acquired:
             return False
 
-        return item.matches(self._needle)
+        if item.matches(self._needle):
+            return True
+
+        # The search index on the model is built from the raw catalog name,
+        # so "Blood Bond" would find nothing while `Trait_BloodBond` did.
+        return self._needle.casefold() in obj.display_name.casefold()
 
     # ------------------------------------------------------------------
     # Signals
@@ -320,6 +328,14 @@ class ItemsView(Gtk.Box):
                 if analysis is not None
                 else {}
             )
+            self._display_names = (
+                {
+                    entry.id: self._icons.display_name_for(entry)
+                    for entry in analysis.catalog.values()
+                }
+                if analysis is not None
+                else {}
+            )
 
         self._analysis = analysis
         self._character = character
@@ -332,7 +348,11 @@ class ItemsView(Gtk.Box):
 
         self._store.remove_all()
         if items:
-            self._store.splice(0, 0, [ItemObject(item) for item in items])
+            self._store.splice(
+                0,
+                0,
+                [ItemObject(item, self._display_names.get(item.id)) for item in items],
+            )
 
         self._summary.set_label(f"{self._counts.acquired} / {self._counts.total}" if items else "")
         self._update_empty_state()
@@ -435,8 +455,8 @@ def _build_sorter() -> Gtk.Sorter:
     """By category in display order, alphabetical within that."""
 
     def compare(a: ItemObject, b: ItemObject, _user_data=None) -> int:
-        key_a = (category_sort_key(a.item.category), a.item.name.casefold())
-        key_b = (category_sort_key(b.item.category), b.item.name.casefold())
+        key_a = (category_sort_key(a.item.category), a.display_name.casefold())
+        key_b = (category_sort_key(b.item.category), b.display_name.casefold())
         return (key_a > key_b) - (key_a < key_b)
 
     return Gtk.CustomSorter.new(compare)

@@ -120,6 +120,20 @@ def _normalize(text: str) -> str:
     return _NON_ALNUM_RE.sub("", text.lower())
 
 
+def prettify_id(raw: str) -> str:
+    """Best effort at a readable name from an internal id.
+
+    Only a fallback: for everything the export knows, its own spelling is
+    better. The catalog does occasionally run ahead of the
+    community-maintained export though, and "Blood Bond" still beats
+    ``Trait_BloodBond`` in a list.
+    """
+    bare = _PREFIX_RE.sub("", raw)
+    spaced = _LOWER_UPPER_RE.sub(" ", bare)
+    spaced = _UPPER_UPPER_LOWER_RE.sub(" ", spaced)
+    return spaced.replace("_", " ").strip() or raw
+
+
 def _slug_from_wiki_link(link: str) -> str | None:
     """The path of a wiki.gg URL (without the domain) is the image path name.
 
