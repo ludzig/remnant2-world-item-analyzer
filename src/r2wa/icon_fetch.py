@@ -25,6 +25,7 @@ from .iteminfo import (
     load_rows,
     load_toolkit_rows,
 )
+from .paths import icons_dir
 
 #: Width of the downloaded thumbnails in pixels. The views draw icons at
 #: 32 logical pixels, so this leaves room for a HiDPI display at scale 2 to
@@ -32,10 +33,10 @@ from .iteminfo import (
 #: cached - delete the icons directory to pick up a new width.
 ICON_WIDTH = 128
 
-#: Target directory; sits next to the parser binary, because both are
-#: regenerable, unversioned build artifacts.
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_ICONS_DIR = REPO_ROOT / "build" / "icons"
+#: Target directory; in the working directory it sits next to the parser
+#: binary, because both are regenerable, unversioned build artifacts. An
+#: installed copy has them shipped along instead (see :mod:`r2wa.paths`).
+DEFAULT_ICONS_DIR = icons_dir()
 
 #: Portraits are drawn at twice the size of an item icon (see
 #: ``PORTRAIT_SIZE`` in the worlds view), so they need their own width to

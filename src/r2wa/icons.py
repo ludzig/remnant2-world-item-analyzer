@@ -36,12 +36,10 @@ from .iteminfo import (
     prettify_id,
     wiki_page_url,
 )
-
-#: Root of the working directory, two levels up from src/r2wa/.
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from .paths import data_dir
 
 #: Hand-picked icons for items the automated pipeline can't derive a slug for.
-DEFAULT_MANUAL_ICONS_DIR = REPO_ROOT / "data" / "manual_icons"
+DEFAULT_MANUAL_ICONS_DIR = data_dir() / "manual_icons"
 
 
 class IconLookup:

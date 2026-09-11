@@ -27,26 +27,24 @@ from pathlib import Path
 from urllib.parse import quote, urlsplit
 
 from .models import CatalogItem, LootItem
-
-#: Root of the working directory, two levels up from src/r2wa/.
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from .paths import data_dir
 
 #: Location of the CSV export; overridable for tests and alternative data sets.
-DEFAULT_ITEMINFO_CSV = REPO_ROOT / "data" / "iteminfo.csv"
+DEFAULT_ITEMINFO_CSV = data_dir() / "iteminfo.csv"
 
 #: Save-file slugs and CDN image paths, extracted from the toolkit's sources.
-DEFAULT_TOOLKIT_CSV = REPO_ROOT / "data" / "toolkit_items.csv"
+DEFAULT_TOOLKIT_CSV = data_dir() / "toolkit_items.csv"
 
 #: Wiki pages looked up by hand, for items no data source lists at all -
 #: quest items and crafting materials. Doubles as a record of where the
 #: matching file in ``data/manual_icons/`` came from.
-DEFAULT_MANUAL_LINKS_CSV = REPO_ROOT / "data" / "manual_links.csv"
+DEFAULT_MANUAL_LINKS_CSV = data_dir() / "manual_links.csv"
 
 #: The name of a vendor or boss (as the save writes it), their portrait's
 #: filename on the wiki, and their wiki page. Neither can be derived from
 #: the name: "Reggie" is filed under his full name, "Nightweaver" under
 #: "The Nightweaver", and the game's own spelling is not always the wiki's.
-DEFAULT_PORTRAITS_CSV = REPO_ROOT / "data" / "portraits.csv"
+DEFAULT_PORTRAITS_CSV = data_dir() / "portraits.csv"
 
 #: Categories under which the catalog keeps items that sit under a different
 #: name in the CSV export (armor is split there by piece).
