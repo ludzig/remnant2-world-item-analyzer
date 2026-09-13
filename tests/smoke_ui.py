@@ -95,6 +95,16 @@ def pump_until(condition, seconds: float = 10.0) -> bool:
     return condition()
 
 
+def loaded_items(view: ItemsView) -> list:
+    """Every item the view holds, across all categories."""
+    return [obj for category in view._categories for obj in category.store]
+
+
+def visible_items(view: ItemsView) -> int:
+    """Item rows left by the filters. The category rows are not counted."""
+    return sum(category.items.get_n_items() for category in view._categories)
+
+
 def pump_search(view: ItemsView, needle: str, expected: int) -> None:
     """Type into the search entry and wait for the list to reflect it.
 
@@ -111,9 +121,9 @@ def pump_search(view: ItemsView, needle: str, expected: int) -> None:
     for _ in range(3):
         view._search.set_text(needle)
         pump_until(lambda: view._needle == needle.strip())
-        pump_until(lambda: view._model.get_n_items() == expected)
+        pump_until(lambda: visible_items(view) == expected)
 
-        if view._search.get_text() == needle and view._model.get_n_items() == expected:
+        if view._search.get_text() == needle and visible_items(view) == expected:
             return
         print(f"  (retrying search: entry became {view._search.get_text()!r})")
 
@@ -139,26 +149,26 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
     pump()
 
     total = len(character.items)
-    check(items_view._store.get_n_items() == total, f"store holds {total} items")
-    check(items_view._model.get_n_items() == total, "all visible without a filter")
+    check(len(loaded_items(items_view)) == total, f"store holds {total} items")
+    check(visible_items(items_view) == total, "all visible without a filter")
 
     # The filter must leave exactly the missing items.
     missing = sum(1 for i in character.items if not i.acquired)
     items_view._on_status_changed(Status.MISSING)
     pump()
-    check(items_view._model.get_n_items() == missing, f"'Missing' filter shows {missing}")
+    check(visible_items(items_view) == missing, f"'Missing' filter shows {missing}")
 
     acquired = total - missing
     items_view._on_status_changed(Status.ACQUIRED)
     pump()
-    check(items_view._model.get_n_items() == acquired, f"'Found' filter shows {acquired}")
+    check(visible_items(items_view) == acquired, f"'Found' filter shows {acquired}")
 
     items_view._on_status_changed(Status.ALL)
     pump()
 
     # Names: the analyzer leaves the internal id in `name` for a good half
     # of the catalog, traits for all of them. Nothing may reach a row raw.
-    raw_named = [obj.item.id for obj in items_view._store if obj.display_name == obj.item.id]
+    raw_named = [obj.item.id for obj in loaded_items(items_view) if obj.display_name == obj.item.id]
     check(
         not raw_named,
         f"every row has a real name, not an internal id ({len(raw_named)} raw: {raw_named[:3]})",
@@ -196,12 +206,12 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
 
     expected = sum(1 for i in character.items if would_match(i, needle))
     pump_search(items_view, needle, expected)
-    hits = items_view._model.get_n_items()
+    hits = visible_items(items_view)
     check(
         hits == expected,
         f"search '{needle}' finds {expected} (got {hits}, "
         f"needle={items_view._needle!r}, entry={items_view._search.get_text()!r}, "
-        f"store={items_view._store.get_n_items()})",
+        f"store={len(loaded_items(items_view))})",
     )
 
     # A name that only exists after resolving: "Blood Bond" is
@@ -218,17 +228,51 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
         wanted = sum(1 for i in character.items if would_match(i, two_word))
         pump_search(items_view, two_word, wanted)
         check(
-            items_view._model.get_n_items() == wanted and wanted > 0,
+            visible_items(items_view) == wanted and wanted > 0,
             f"search finds the resolved name {two_word!r}",
         )
 
     pump_search(items_view, "zzz-does-not-exist-zzz", 0)
-    check(items_view._model.get_n_items() == 0, "nonsense search yields nothing")
+    check(visible_items(items_view) == 0, "nonsense search yields nothing")
     check(items_view._empty.get_visible(), "empty state is shown")
 
     pump_search(items_view, "", total)
     check(not items_view._empty.get_visible(), "empty state disappears again")
-    check(items_view._model.get_n_items() == total, "all visible again after clearing")
+    check(visible_items(items_view) == total, "all visible again after clearing")
+
+    # Folding. The categories are rows of the list now, so collapsing one
+    # takes its items out of the list without taking the heading with them.
+    categories = [obj.category for obj in items_view._categories]
+    unfolded = items_view._tree.get_n_items()
+    check(
+        unfolded == total + len(categories),
+        f"{len(categories)} category rows on top of {total} items (got {unfolded})",
+    )
+
+    items_view._toggle_all.emit("clicked")
+    pump()
+    check(
+        items_view._tree.get_n_items() == len(categories),
+        "collapsing all leaves nothing but the category rows",
+    )
+    check(visible_items(items_view) == total, "... while the items stay in the model")
+
+    # A search has to be able to show what it found, so it opens the folded
+    # categories - and folds them back when the search box is empty again.
+    pump_search(items_view, needle, expected)
+    check(
+        items_view._tree.get_n_items() > items_view._visible.get_n_items(),
+        "a search opens the folded categories",
+    )
+    pump_search(items_view, "", total)
+    check(
+        items_view._collapsed == set(categories),
+        "clearing the search folds them back the way they were",
+    )
+
+    items_view._toggle_all.emit("clicked")
+    pump()
+    check(items_view._tree.get_n_items() == unfolded, "expanding all brings the items back")
 
     # Account-wide view
     if len(analysis.characters) > 1:
@@ -236,7 +280,7 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
         pump()
         aggregate = analysis.aggregate_items()
         check(
-            items_view._store.get_n_items() == len(aggregate),
+            len(loaded_items(items_view)) == len(aggregate),
             f"'All Characters' view shows {len(aggregate)} items",
         )
         items_view._on_scope_changed(Scope.CHARACTER)
@@ -445,7 +489,8 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
     items_view.set_analysis(None, None)
     worlds_view.set_analysis(analysis, None)
     pump()
-    check(items_view._store.get_n_items() == 0, "empty selection clears the list")
+    check(not loaded_items(items_view), "empty selection clears the list")
+    check(items_view._tree.get_n_items() == 0, "... category rows and all")
 
     if show:
         print("\nWindow stays open - close it to quit.")

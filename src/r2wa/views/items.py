@@ -12,7 +12,7 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from ..gobjects import ItemObject  # noqa: E402
+from ..gobjects import CategoryObject, ItemObject  # noqa: E402
 from ..icons import IconLookup  # noqa: E402
 from ..models import (  # noqa: E402
     Analysis,
@@ -45,7 +45,12 @@ class Scope(Enum):
 
 
 class ItemsView(Gtk.Box):
-    """Filtered, category-grouped list of all collectibles."""
+    """Collapsible, category-grouped list of all collectibles.
+
+    The categories are rows of the list, not headings above it: with close
+    to a thousand items the way to find something is to fold away the
+    thirteen categories one is not looking at.
+    """
 
     __gtype_name__ = "R2waItemsView"
 
@@ -65,20 +70,25 @@ class ItemsView(Gtk.Box):
         # catalog, traits included. Resolved once per analysis, not per row.
         self._display_names: dict[str, str] = {}
 
-        # Data chain: store -> filter -> sort with sections.
-        # Gtk.SortListModel provides the sections for the category headers
-        # once a section sorter is set (GTK 4.12+).
-        self._store = Gio.ListStore.new(ItemObject)
+        # Which categories are folded away, by category name rather than by
+        # row: the rows are rebuilt on every character switch, the choice of
+        # what to look at outlives them.
+        self._collapsed: set[str] = set()
+        self._collapsed_before_search: set[str] | None = None
 
+        # Data chain: one store per category, each behind the shared item
+        # filter, all of them behind a filter that drops categories without
+        # a match, and a tree on top that turns them into expandable rows.
         self._filter = Gtk.CustomFilter.new(self._match)
-        filtered = Gtk.FilterListModel.new(self._store, self._filter)
 
-        self._model = Gtk.SortListModel.new(filtered, _build_sorter())
-        self._model.set_section_sorter(_build_section_sorter())
+        self._categories = Gio.ListStore.new(CategoryObject)
+        self._category_filter = Gtk.CustomFilter.new(_has_matches)
+        self._visible = Gtk.FilterListModel.new(self._categories, self._category_filter)
+        self._tree = Gtk.TreeListModel.new(self._visible, False, False, _children_of)
 
         self.append(self._build_toolbar())
 
-        self._scroller = self._build_list(self._model)
+        self._scroller = self._build_list(self._tree)
         self.append(self._scroller)
 
         self._empty = Adw.StatusPage(
@@ -90,7 +100,7 @@ class ItemsView(Gtk.Box):
         )
         self.append(self._empty)
 
-        self._model.connect("items-changed", lambda *_: self._update_empty_state())
+        self._visible.connect("items-changed", lambda *_: self._update_empty_state())
 
     # ------------------------------------------------------------------
     # Layout
@@ -139,6 +149,15 @@ class ItemsView(Gtk.Box):
         )
         bar.append(self._scope_group)
 
+        self._toggle_all = Gtk.Button(
+            icon_name="pan-up-symbolic",
+            css_classes=["flat"],
+            valign=Gtk.Align.CENTER,
+            tooltip_text="Collapse all categories",
+        )
+        self._toggle_all.connect("clicked", self._on_toggle_all)
+        bar.append(self._toggle_all)
+
         self._summary = Gtk.Label(css_classes=["dim-label", "numeric"], xalign=1.0)
         bar.append(self._summary)
 
@@ -146,17 +165,13 @@ class ItemsView(Gtk.Box):
 
     def _build_list(self, model: Gio.ListModel) -> Gtk.Widget:
         factory = Gtk.SignalListItemFactory()
-        factory.connect("setup", _setup_row)
+        factory.connect("setup", self._setup_row)
         factory.connect("bind", self._bind_row)
-
-        header_factory = Gtk.SignalListItemFactory()
-        header_factory.connect("setup", _setup_header)
-        header_factory.connect("bind", self._bind_header)
+        factory.connect("unbind", _unbind_row)
 
         self._list = Gtk.ListView(
             model=Gtk.NoSelection.new(model),
             factory=factory,
-            header_factory=header_factory,
             vexpand=True,
             show_separators=False,
         )
@@ -171,10 +186,65 @@ class ItemsView(Gtk.Box):
     # Rows
     # ------------------------------------------------------------------
 
+    def _setup_row(self, _factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+        """Build both kinds of row at once.
+
+        A Gtk.ListView has a single factory, and the tree hands it category
+        rows and item rows interleaved. Building both and showing one is
+        cheaper than rebuilding a widget on every bind - the list recycles
+        roughly as many widgets as fit on screen, not one per item.
+        """
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+
+        header = _build_category_row()
+        header.connect("clicked", self._on_category_clicked)
+        box.append(header)
+
+        row = _build_item_row()
+        box.append(row)
+
+        box.r2wa_header = header
+        box.r2wa_item = row
+
+        list_item.set_child(box)
+
     def _bind_row(self, _factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
-        obj: ItemObject = list_item.get_item()
+        tree_row: Gtk.TreeListRow = list_item.get_item()
+        obj = tree_row.get_item()
+        box = list_item.get_child()
+
+        is_category = isinstance(obj, CategoryObject)
+        box.r2wa_header.set_visible(is_category)
+        box.r2wa_item.set_visible(not is_category)
+
+        if is_category:
+            self._bind_category(box.r2wa_header, tree_row, obj)
+        else:
+            self._bind_item(box.r2wa_item, obj)
+
+    def _bind_category(
+        self, header: Gtk.Button, tree_row: Gtk.TreeListRow, obj: CategoryObject
+    ) -> None:
+        header.r2wa_tree_row = tree_row
+        header.r2wa_title.set_label(category_label(obj.category))
+
+        # The counter deliberately shows the full stock of the category, not
+        # the currently visible subset - otherwise it would be worthless
+        # while filtering.
+        counts = self._counts.by_category.get(obj.category)
+        header.r2wa_count.set_label(f"{counts.acquired} / {counts.total}" if counts else "")
+
+        _set_arrow(header.r2wa_arrow, tree_row.get_expanded())
+        # Folding also happens from the toolbar button, which never touches
+        # this widget - so the arrow follows the row's own state rather than
+        # the click that caused it.
+        header.r2wa_notify = tree_row.connect(
+            "notify::expanded",
+            lambda row, _param: _set_arrow(header.r2wa_arrow, row.get_expanded()),
+        )
+
+    def _bind_item(self, row: Adw.ActionRow, obj: ItemObject) -> None:
         item = obj.item
-        row: Adw.ActionRow = list_item.get_child()
 
         row.set_title(_escape(obj.display_name))
         row.set_subtitle(_escape(self._subtitle_for(item)))
@@ -265,21 +335,6 @@ class ItemsView(Gtk.Box):
 
         return badges
 
-    def _bind_header(
-        self, _factory: Gtk.SignalListItemFactory, list_header: Gtk.ListHeader
-    ) -> None:
-        obj: ItemObject = list_header.get_item()
-        category = obj.item.category
-        box = list_header.get_child()
-
-        box.r2wa_title.set_label(category_label(category))
-
-        # The counter deliberately shows the full stock of the category, not
-        # the currently visible subset - otherwise it would be worthless
-        # while filtering.
-        counts = self._counts.by_category.get(category)
-        box.r2wa_count.set_label(f"{counts.acquired} / {counts.total}" if counts else "")
-
     # ------------------------------------------------------------------
     # Filter
     # ------------------------------------------------------------------
@@ -299,17 +354,88 @@ class ItemsView(Gtk.Box):
         # so "Blood Bond" would find nothing while `Trait_BloodBond` did.
         return self._needle.casefold() in obj.display_name.casefold()
 
+    def _refilter(self) -> None:
+        """Re-run both filters and put the rows back in shape.
+
+        The order matters: the category filter asks each category how many
+        items are left, so the items have to be thinned out first. The
+        expansion pass comes last because a filter change can bring a
+        category row back that was gone a keystroke ago.
+        """
+        self._filter.changed(Gtk.FilterChange.DIFFERENT)
+        self._category_filter.changed(Gtk.FilterChange.DIFFERENT)
+        self._apply_expansion()
+
+    # ------------------------------------------------------------------
+    # Folding
+    # ------------------------------------------------------------------
+
+    def _apply_expansion(self) -> None:
+        """Put every category row into the state :attr:`_collapsed` asks for."""
+        for index in range(self._visible.get_n_items()):
+            row = self._tree.get_child_row(index)
+            if row is None:
+                continue
+            row.set_expanded(row.get_item().category not in self._collapsed)
+        self._sync_toggle_all()
+
+    def _on_category_clicked(self, header: Gtk.Button) -> None:
+        tree_row: Gtk.TreeListRow | None = header.r2wa_tree_row
+        if tree_row is None:
+            return
+
+        category = tree_row.get_item().category
+        if category in self._collapsed:
+            self._collapsed.discard(category)
+        else:
+            self._collapsed.add(category)
+
+        tree_row.set_expanded(category not in self._collapsed)
+        self._sync_toggle_all()
+
+    def _on_toggle_all(self, _button: Gtk.Button) -> None:
+        categories = [obj.category for obj in self._categories]
+        if any(category not in self._collapsed for category in categories):
+            self._collapsed.update(categories)
+        else:
+            self._collapsed.clear()
+        self._apply_expansion()
+
+    def _sync_toggle_all(self) -> None:
+        """One button for both directions - it offers whatever is left to do."""
+        categories = [obj.category for obj in self._categories]
+        self._toggle_all.set_sensitive(bool(categories))
+
+        collapse = any(category not in self._collapsed for category in categories)
+        self._toggle_all.set_icon_name("pan-up-symbolic" if collapse else "pan-down-symbolic")
+        self._toggle_all.set_tooltip_text(
+            "Collapse all categories" if collapse else "Expand all categories"
+        )
+
     # ------------------------------------------------------------------
     # Signals
     # ------------------------------------------------------------------
 
     def _on_search_changed(self, entry: Gtk.SearchEntry) -> None:
-        self._needle = entry.get_text().strip()
-        self._filter.changed(Gtk.FilterChange.DIFFERENT)
+        needle = entry.get_text().strip()
+
+        # A search has to be able to show what it found, so starting one
+        # opens every category. What was folded away comes back once the
+        # search box is empty again - including anything folded meanwhile,
+        # which belongs to the search, not to the list.
+        if needle and self._collapsed_before_search is None:
+            self._collapsed_before_search = set(self._collapsed)
+            self._collapsed.clear()
+        elif not needle and self._collapsed_before_search is not None:
+            self._collapsed = self._collapsed_before_search
+            self._collapsed_before_search = None
+
+        self._needle = needle
+        self._refilter()
 
     def _on_status_changed(self, status: Status) -> None:
         self._status = status
-        self._filter.changed(Gtk.FilterChange.DIFFERENT)
+        self._refilter()
 
     def _on_scope_changed(self, scope: Scope) -> None:
         if scope is self._scope:
@@ -362,16 +488,34 @@ class ItemsView(Gtk.Box):
         items = self._current_items()
         self._counts = counts_for(items)
 
-        self._store.remove_all()
-        if items:
-            self._store.splice(
-                0,
-                0,
-                [ItemObject(item, self._display_names.get(item.id)) for item in items],
+        self._categories.remove_all()
+        for category, entries in self._grouped(items):
+            store = Gio.ListStore.new(ItemObject)
+            store.splice(0, 0, entries)
+            self._categories.append(
+                CategoryObject(category, store, Gtk.FilterListModel.new(store, self._filter))
             )
 
+        self._apply_expansion()
         self._summary.set_label(f"{self._counts.acquired} / {self._counts.total}" if items else "")
         self._update_empty_state()
+
+    def _grouped(self, items: list[Item]) -> list[tuple[str, list[ItemObject]]]:
+        """Group into categories in display order, alphabetical within each.
+
+        Sorted here rather than by a Gtk.Sorter per category: the order only
+        changes when the items do, which is once per character switch.
+        """
+        groups: dict[str, list[ItemObject]] = {}
+        for item in items:
+            groups.setdefault(item.category, []).append(
+                ItemObject(item, self._display_names.get(item.id))
+            )
+
+        for entries in groups.values():
+            entries.sort(key=lambda obj: obj.display_name.casefold())
+
+        return sorted(groups.items(), key=lambda group: category_sort_key(group[0]))
 
     def _current_items(self) -> list[Item]:
         if self._analysis is None:
@@ -381,7 +525,7 @@ class ItemsView(Gtk.Box):
         return list(self._character.items) if self._character else []
 
     def _update_empty_state(self) -> None:
-        has_rows = self._model.get_n_items() > 0
+        has_rows = self._visible.get_n_items() > 0
         self._empty.set_visible(not has_rows)
         self._scroller.set_visible(has_rows)
 
@@ -391,7 +535,54 @@ class ItemsView(Gtk.Box):
 # ----------------------------------------------------------------------
 
 
-def _setup_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+def _children_of(obj: CategoryObject | ItemObject, _user_data=None) -> Gio.ListModel | None:
+    """What hangs under a row - items under a category, nothing under an item."""
+    return obj.items if isinstance(obj, CategoryObject) else None
+
+
+def _has_matches(obj: CategoryObject, _user_data=None) -> bool:
+    return obj.items.get_n_items() > 0
+
+
+def _build_category_row() -> Gtk.Button:
+    """The category row: an arrow, the name, and the category's tally.
+
+    A button rather than a bare box, so the whole width answers to a click
+    and the row can be reached with the keyboard - the arrow alone would be
+    a needlessly small target.
+    """
+    arrow = Gtk.Image(icon_name="pan-down-symbolic")
+    title = Gtk.Label(xalign=0.0, hexpand=True, css_classes=["heading"])
+    count = Gtk.Label(xalign=1.0, css_classes=["dim-label", "numeric"])
+
+    box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+    box.append(arrow)
+    box.append(title)
+    box.append(count)
+
+    button = Gtk.Button(
+        child=box,
+        css_classes=["flat"],
+        hexpand=True,
+        margin_top=12,
+        margin_bottom=2,
+        margin_start=6,
+        margin_end=6,
+        cursor=Gdk.Cursor.new_from_name("pointer"),
+    )
+
+    button.r2wa_arrow = arrow
+    button.r2wa_title = title
+    button.r2wa_count = count
+    # Both set in _bind_category; rows are recycled while scrolling, so a
+    # click may well arrive after the widget has moved to another category.
+    button.r2wa_tree_row = None
+    button.r2wa_notify = 0
+
+    return button
+
+
+def _build_item_row() -> Adw.ActionRow:
     row = Adw.ActionRow(activatable=False, subtitle_lines=2)
 
     # If there is no icon, the area stays blank instead of hiding the
@@ -417,7 +608,7 @@ def _setup_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> 
     )
     row.add_suffix(suffix)
 
-    # Badges are cleared and rebuilt on every bind (see _bind_row); this
+    # Badges are cleared and rebuilt on every bind (see _bind_item); this
     # inner box isolates that from the link button, which must survive it.
     badges = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6, valign=Gtk.Align.CENTER)
     suffix.append(badges)
@@ -444,49 +635,24 @@ def _setup_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> 
     row.r2wa_link = link
     row.r2wa_wiki_url = None
 
-    list_item.set_child(row)
+    return row
 
 
-def _setup_header(_factory: Gtk.SignalListItemFactory, list_header: Gtk.ListHeader) -> None:
-    box = Gtk.Box(
-        orientation=Gtk.Orientation.HORIZONTAL,
-        spacing=12,
-        margin_top=18,
-        margin_bottom=6,
-        margin_start=12,
-        margin_end=12,
-    )
-    title = Gtk.Label(xalign=0.0, hexpand=True, css_classes=["heading"])
-    count = Gtk.Label(xalign=1.0, css_classes=["dim-label", "numeric"])
-    box.append(title)
-    box.append(count)
+def _unbind_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
+    """Let go of the row the widget was showing.
 
-    box.r2wa_title = title
-    box.r2wa_count = count
-
-    list_header.set_child(box)
+    The expansion listener has to go with it: the widget outlives the row it
+    was bound to, and would otherwise keep drawing a second category's arrow.
+    """
+    header: Gtk.Button = list_item.get_child().r2wa_header
+    if header.r2wa_notify:
+        header.r2wa_tree_row.disconnect(header.r2wa_notify)
+        header.r2wa_notify = 0
+    header.r2wa_tree_row = None
 
 
-def _build_sorter() -> Gtk.Sorter:
-    """By category in display order, alphabetical within that."""
-
-    def compare(a: ItemObject, b: ItemObject, _user_data=None) -> int:
-        key_a = (category_sort_key(a.item.category), a.display_name.casefold())
-        key_b = (category_sort_key(b.item.category), b.display_name.casefold())
-        return (key_a > key_b) - (key_a < key_b)
-
-    return Gtk.CustomSorter.new(compare)
-
-
-def _build_section_sorter() -> Gtk.Sorter:
-    """Groups the list by category; must match the sort order."""
-
-    def compare(a: ItemObject, b: ItemObject, _user_data=None) -> int:
-        key_a = category_sort_key(a.item.category)
-        key_b = category_sort_key(b.item.category)
-        return (key_a > key_b) - (key_a < key_b)
-
-    return Gtk.CustomSorter.new(compare)
+def _set_arrow(arrow: Gtk.Image, expanded: bool) -> None:
+    arrow.set_from_icon_name("pan-down-symbolic" if expanded else "pan-end-symbolic")
 
 
 def _clear(box: Gtk.Box) -> None:

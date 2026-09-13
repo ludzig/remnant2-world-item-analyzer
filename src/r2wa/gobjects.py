@@ -14,7 +14,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 
-from gi.repository import GObject  # noqa: E402
+from gi.repository import Gio, GObject  # noqa: E402
 
 from .models import Character, Item, Location, LootItem, Zone  # noqa: E402
 
@@ -45,6 +45,24 @@ class ItemObject(GObject.Object):
     @GObject.Property(type=bool, default=False, flags=GObject.ParamFlags.READABLE)
     def acquired(self) -> bool:
         return self.item.acquired
+
+
+class CategoryObject(GObject.Object):
+    """A collapsible category in the item list.
+
+    ``store`` holds every item of the category, ``items`` the filtered view
+    of it that the list actually shows. The category row drops out of the
+    list as soon as that view runs empty, so a search never leaves a
+    heading behind with nothing under it.
+    """
+
+    __gtype_name__ = "R2waCategoryObject"
+
+    def __init__(self, category: str, store: Gio.ListStore, items: Gio.ListModel):
+        super().__init__()
+        self.category = category
+        self.store = store
+        self.items = items
 
 
 class CharacterObject(GObject.Object):
