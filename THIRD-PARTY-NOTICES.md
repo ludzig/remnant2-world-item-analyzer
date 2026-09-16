@@ -42,7 +42,9 @@ build on.
 Two data files come from this project:
 
 - `data/iteminfo.csv` - an item export from its database: item names,
-  categories, and a link to the matching wiki page per item.
+  categories, and a link to the matching wiki page per item. The export's
+  `description` column held the game's own item text; it was never read and
+  has been removed, so none of it is redistributed here.
 - `data/toolkit_items.csv` - extracted from the project's sources
   (`src/app/(items)/_constants/*-items.ts`, commit `8be610d`): the slug the
   game writes into the save file, plus the path of the item's image on the
@@ -76,14 +78,22 @@ by the wikis, not by us. Two sources, in this order of preference:
   names the game never uses ("Reggie" is `Reginald_Reggie_Malone.jpg`,
   "Nightweaver" is `The_Nightweaver.jpg`), which is what
   `data/portraits.csv` records.
-- Only for the gaps the wiki leaves - the individual relic fragments and
-  prisms, which it has just colour-coded placeholders for:
-  **Remnant2Toolkit's** own CDN (see above). Fetched for those items alone,
-  never for the whole catalog, and cached locally under `build/`; no such
-  image is redistributed with this repository. Their terms are not stated
-  anywhere, so this is worth asking about before relying on it further -
-  a community project's maintainer being far easier to reach than a
-  corporate legal department.
+- Only for the gaps the wiki leaves: **Remnant2Toolkit's** own CDN (see
+  above). 75 images, fetched item by item and never for the whole catalog.
+  The bulk of them are what the wiki has only colour-coded placeholders
+  for - 46 relic fragments and 7 prisms - and the remaining 22 are items it
+  carries no usable picture of at all (12 skills, 4 perks, 3 consumables,
+  and one each of a weapon, a mod and an armour piece).
+
+  They are cached under `build/` and are **not** in this repository. They
+  **are**, however, inside the Flatpak bundle `just flatpak-bundle`
+  produces, because that copies `build/icons` wholesale (see
+  `packaging/io.github.ludzig.R2wa.yml`) - so handing someone the bundle
+  does redistribute them.
+
+  Their terms are not stated anywhere. Rather than assume, the question of
+  whether both this and the two derived CSVs above are welcome has been put
+  to the project's maintainer; the answer will be recorded here.
 
 ## Further dependencies of the parser
 

@@ -19,10 +19,9 @@ def _item(item_id: str, name: str, category: str) -> CatalogItem:
 
 def _write_csv(tmp_path: Path, rows: list[dict[str, str]]) -> Path:
     path = tmp_path / "iteminfo.csv"
-    header = "id,name,category,description,wikiLinks\n"
+    header = "id,name,category,wikiLinks\n"
     body = "\n".join(
-        f"{r['id']},{r['name']},{r['category']},{r.get('description', '')},{r.get('wikiLinks', '')}"
-        for r in rows
+        f"{r['id']},{r['name']},{r['category']},{r.get('wikiLinks', '')}" for r in rows
     )
     path.write_text(header + body + "\n", encoding="utf-8")
     return path
@@ -81,6 +80,28 @@ class TestLoadRows:
 
         assert rows[0].wiki_slug is None
         assert not rows[0].has_icon
+
+    def test_unbekannte_spalten_stoeren_nicht(self, tmp_path: Path) -> None:
+        """A re-export may carry columns we do not want.
+
+        The shipped CSV used to have a `description` column holding the
+        game's own item text; it was never read and no longer ships. Anyone
+        exporting afresh from the toolkit will have it again, and that must
+        not break the import.
+        """
+        path = tmp_path / "iteminfo.csv"
+        path.write_text(
+            "id,name,category,description,wikiLinks\n"
+            "x,Abrasive Whetstone,amulet,Some in-game text,"
+            "https://remnant.wiki/Abrasive_Whetstone\n",
+            encoding="utf-8",
+        )
+
+        rows = iteminfo.load_rows(path)
+
+        assert len(rows) == 1
+        assert rows[0].name == "Abrasive Whetstone"
+        assert rows[0].wiki_slug == "Abrasive_Whetstone"
 
 
 class TestItemInfoIndex:

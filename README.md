@@ -239,5 +239,18 @@ bundle instead of being built from source. See the comments in
 
 ## License
 
-MIT — see [LICENSE](LICENSE). For the third-party components used, see
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+The code is MIT — see [LICENSE](LICENSE).
+
+Not everything in this repository is, and an MIT badge alone would promise
+more than it can keep:
+
+| | Origin | Terms |
+| --- | --- | --- |
+| `data/manual_icons/` (32 PNG) | [Remnant 2 Wiki](https://remnant2.wiki.gg/) | CC BY-NC-SA 4.0 — **non-commercial**, share alike |
+| `data/iteminfo.csv`, `data/toolkit_items.csv` | [Remnant2Toolkit](https://github.com/joshpayette/remnant2-toolkit) | derived from a **GPL-3.0** project |
+
+Reusing those two rows is therefore not simply MIT, whatever this file says
+about the code around them. The item pictures the application downloads at
+build time come from the same two places and are covered by the same terms.
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) has the detail, including
+which fields were taken and why.
