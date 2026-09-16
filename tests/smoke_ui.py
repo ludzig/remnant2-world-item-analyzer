@@ -324,8 +324,11 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
                 f"selecting a location shows its {expected_items} items",
             )
 
-            # The item list's own status filter.
-            missing = sum(1 for i in first_location.items if not i.is_looted)
+            # The item list's own status filter. "Missing" asks what the
+            # items view asks - does the character have it - not whether
+            # this one drop is still lying there.
+            owned = with_world.owned_ids
+            missing = sum(1 for i in first_location.items if i.id not in owned)
             worlds_view._on_item_status_changed(ItemStatus.MISSING)
             pump()
             check(
@@ -334,6 +337,27 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
             )
             worlds_view._on_item_status_changed(ItemStatus.ALL)
             pump()
+
+            # The regression the nephew found: an item owned from an
+            # earlier roll or the other mode showed no checkmark here,
+            # because the world only knows whether its own drop was taken.
+            owned_here = [obj for obj in worlds_view._item_store if obj.acquired]
+            mismatched = [
+                obj.item.id
+                for obj in worlds_view._item_store
+                if obj.acquired != (obj.item.id in owned)
+            ]
+            check(
+                not mismatched,
+                f"loot rows agree with the character's collection ({mismatched[:3]})",
+            )
+            unlooted_but_owned = [obj.item.id for obj in owned_here if not obj.item.is_looted]
+            if unlooted_but_owned:
+                check(
+                    True,
+                    f"{len(unlooted_but_owned)} owned but not looted here, "
+                    f"e.g. {unlooted_but_owned[0]}",
+                )
 
         if len(campaign.zones) > 1:
             # A live save-game reload must restore the drill-down the user
@@ -357,8 +381,18 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
             # the bug through the first time.
             worlds_view.set_analysis(reloaded, None)
             pump()
+            check(not worlds_view._owned, "no character means no collection")
+
             worlds_view.set_analysis(reloaded, reloaded_character)
             pump()
+
+            # The checkmarks and the open counts are derived from this set,
+            # so a reload that kept the old one would quietly show yesterday's
+            # answer for everything picked up since.
+            check(
+                worlds_view._owned == reloaded_character.owned_ids and bool(worlds_view._owned),
+                f"reload re-derives the collection ({len(worlds_view._owned)} items)",
+            )
 
             selected_zone = worlds_view._zone_selection.get_selected_item()
             check(

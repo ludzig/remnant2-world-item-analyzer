@@ -222,9 +222,29 @@ class TestWelten:
         yaesha = campaign.zones[1]
 
         # Probability Cord has been collected, Chakra hasn't.
-        assert yaesha.locations[0].open_item_count == 1
-        assert yaesha.open_item_count == 1
-        assert campaign.zones[0].open_item_count == 1
+        assert yaesha.locations[0].open_item_count() == 1
+        assert yaesha.open_item_count() == 1
+        assert campaign.zones[0].open_item_count() == 1
+
+    def test_bereits_besessene_items_zaehlen_nicht_als_offen(self, analysis: Analysis) -> None:
+        """An item owned from elsewhere is no reason to walk there.
+
+        `is_looted` only covers this one roll - it says the drop is gone
+        from here, not that the player has the item. Somebody who picked it
+        up in an earlier roll still sees the drop lying around.
+        """
+        location = analysis.character(0).world("campaign").zones[1].locations[0]
+        (still_open,) = location.open_items()
+
+        assert location.open_item_count({still_open.id}) == 0
+        assert still_open.is_looted is False
+
+    def test_owned_ids_nennt_nur_vorhandenes(self, analysis: Analysis) -> None:
+        character = analysis.character(0)
+        owned = character.owned_ids
+
+        assert owned == {item.id for item in character.items if item.acquired}
+        assert all(not item.acquired for item in character.items if item.id not in owned)
 
     def test_loot_group_label(self, analysis: Analysis) -> None:
         campaign = analysis.character(0).world("campaign")

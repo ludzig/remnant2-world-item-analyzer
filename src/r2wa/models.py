@@ -7,7 +7,7 @@ can be tested without GTK. The GObject wrappers for the list models live in
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -301,10 +301,23 @@ class Location:
         for group in self.loot_groups:
             yield from group.items
 
-    @property
-    def open_item_count(self) -> int:
-        """Number of items at this location not yet collected."""
-        return sum(1 for item in self.items if not item.is_looted)
+    def open_items(self, owned: Collection[str] = ()) -> Iterator[LootItem]:
+        """Loot here that is still worth the walk.
+
+        Two conditions, and both are needed. ``is_looted`` is about this
+        world roll only - it says the drop has been taken or the alternate
+        reward was chosen, so it is gone from *this* roll. It says nothing
+        about whether the player owns the item, which they may well do from
+        an earlier roll, the other mode or a vendor. An item already owned
+        is not worth a trip either.
+        """
+        for item in self.items:
+            if item.id not in owned and not item.is_looted:
+                yield item
+
+    def open_item_count(self, owned: Collection[str] = ()) -> int:
+        """Number of items here the player neither owns nor has used up."""
+        return sum(1 for _ in self.open_items(owned))
 
 
 @dataclass(frozen=True, slots=True)
@@ -325,9 +338,8 @@ class Zone:
             locations=tuple(Location.from_json(loc) for loc in data.get("locations", ())),
         )
 
-    @property
-    def open_item_count(self) -> int:
-        return sum(loc.open_item_count for loc in self.locations)
+    def open_item_count(self, owned: Collection[str] = ()) -> int:
+        return sum(loc.open_item_count(owned) for loc in self.locations)
 
 
 @dataclass(frozen=True, slots=True)
@@ -418,6 +430,16 @@ class Character:
 
     def world(self, slot: str) -> World | None:
         return next((w for w in self.worlds if w.slot == slot), None)
+
+    @property
+    def owned_ids(self) -> frozenset[str]:
+        """Ids of everything this character already has.
+
+        The world loot knows only whether a drop is still lying there, not
+        whether the item is already in the player's hands. Both answers are
+        needed before calling a location worth visiting.
+        """
+        return frozenset(item.id for item in self.items if item.acquired)
 
 
 @dataclass(frozen=True, slots=True)

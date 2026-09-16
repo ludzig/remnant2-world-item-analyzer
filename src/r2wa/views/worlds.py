@@ -70,6 +70,9 @@ class WorldsView(Gtk.Box):
         self._item_status = ItemStatus.ALL
         self._item_needle = ""
         self._icons = IconLookup()
+        # What the character already has. The world loot cannot say - its
+        # `is_looted` is about this roll, not about the player's pockets.
+        self._owned: frozenset[str] = frozenset()
 
         # Remembered by name (zones/locations are rebuilt from scratch on
         # every reload, so there's no stable object to keep a reference to)
@@ -224,16 +227,19 @@ class WorldsView(Gtk.Box):
     # ------------------------------------------------------------------
 
     def _match_zone(self, obj: ZoneObject, _user_data=None) -> bool:
-        return not self._only_open or obj.zone.open_item_count > 0
+        return not self._only_open or obj.open_count > 0
 
     def _match_location(self, obj: LocationObject, _user_data=None) -> bool:
-        return not self._only_open or obj.location.open_item_count > 0
+        return not self._only_open or obj.open_count > 0
 
     def _match_item(self, obj: LootItemObject, _user_data=None) -> bool:
         item = obj.item
-        if self._item_status is ItemStatus.MISSING and item.is_looted:
+        # "Missing"/"Found" ask the same question the items view asks: does
+        # the character have it? Not whether this one drop is still lying
+        # there, which is what `is_looted` answers.
+        if self._item_status is ItemStatus.MISSING and obj.acquired:
             return False
-        if self._item_status is ItemStatus.FOUND and not item.is_looted:
+        if self._item_status is ItemStatus.FOUND and not obj.acquired:
             return False
 
         if self._item_needle:
@@ -307,7 +313,14 @@ class WorldsView(Gtk.Box):
         try:
             self._location_store.remove_all()
             if zone is not None and zone.locations:
-                self._location_store.splice(0, 0, [LocationObject(loc) for loc in zone.locations])
+                self._location_store.splice(
+                    0,
+                    0,
+                    [
+                        LocationObject(loc, loc.open_item_count(self._owned))
+                        for loc in zone.locations
+                    ],
+                )
 
             index = _find_index(
                 self._location_selection, wanted_location_name, lambda obj: obj.location.name
@@ -347,6 +360,7 @@ class WorldsView(Gtk.Box):
                         group_icon_path=group_icon,
                         group_wiki_url=group_url,
                         note=self._note_for(item),
+                        acquired=item.id in self._owned,
                     )
                     for item in group.items
                 )
@@ -409,6 +423,7 @@ class WorldsView(Gtk.Box):
         """
         self._analysis = analysis
         self._character = character
+        self._owned = character.owned_ids if character is not None else frozenset()
         self._update_slot_buttons()
         self._reload()
 
@@ -445,7 +460,11 @@ class WorldsView(Gtk.Box):
         try:
             self._zone_store.remove_all()
             if world is not None and world.zones:
-                self._zone_store.splice(0, 0, [ZoneObject(z) for z in world.zones])
+                self._zone_store.splice(
+                    0,
+                    0,
+                    [ZoneObject(z, z.open_item_count(self._owned)) for z in world.zones],
+                )
 
             index = _find_index(self._zone_selection, wanted_zone_name, lambda obj: obj.zone.name)
             if index is None and self._zone_selection.get_n_items() > 0:
@@ -459,7 +478,7 @@ class WorldsView(Gtk.Box):
         self._remember_zone(selected)
         self._fill_locations(selected.zone if selected else None, wanted_location_name)
 
-        self._info.set_label(_world_summary(world))
+        self._info.set_label(_world_summary(world, self._owned))
 
         has_content = self._zone_store.get_n_items() > 0
         self._columns.set_visible(has_content)
@@ -642,16 +661,14 @@ def _bind_zone_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem)
     # Gtk.Label renders text without markup - this must not be escaped,
     # otherwise an "&" in a zone name would show up as "&amp;".
     box.r2wa_title.set_label(zone.name)
-    box.r2wa_title.set_css_classes(
-        ["dim-label"] if zone.finished and not zone.open_item_count else []
-    )
+    box.r2wa_title.set_css_classes(["dim-label"] if zone.finished and not obj.open_count else [])
 
     subtitle = _zone_subtitle(zone)
     box.r2wa_subtitle.set_label(subtitle)
     box.r2wa_subtitle.set_visible(bool(subtitle))
 
-    box.r2wa_badge.set_label(str(zone.open_item_count) if zone.open_item_count else "")
-    box.r2wa_badge.set_visible(bool(zone.open_item_count))
+    box.r2wa_badge.set_label(str(obj.open_count) if obj.open_count else "")
+    box.r2wa_badge.set_visible(bool(obj.open_count))
 
 
 def _setup_location_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
@@ -666,14 +683,14 @@ def _bind_location_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListI
     box.r2wa_icon.set_from_icon_name("mark-location-symbolic")
 
     box.r2wa_title.set_label(location.name)
-    box.r2wa_title.set_css_classes(["dim-label"] if not location.open_item_count else [])
+    box.r2wa_title.set_css_classes(["dim-label"] if not obj.open_count else [])
 
     subtitle = _location_subtitle(location)
     box.r2wa_subtitle.set_label(subtitle)
     box.r2wa_subtitle.set_visible(bool(subtitle))
 
-    box.r2wa_badge.set_label(str(location.open_item_count) if location.open_item_count else "")
-    box.r2wa_badge.set_visible(bool(location.open_item_count))
+    box.r2wa_badge.set_label(str(obj.open_count) if obj.open_count else "")
+    box.r2wa_badge.set_visible(bool(obj.open_count))
 
 
 def _setup_item_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
@@ -693,18 +710,22 @@ def _bind_item_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem)
 
     box.r2wa_picture.set_filename(str(obj.icon_path) if obj.icon_path else None)
 
-    # Looted items get a checkmark; open ones stay blank instead of a "+" -
-    # the item is already marked "open" by not being dimmed.
+    # Three states, not two. The checkmark means what it means everywhere
+    # else in the app: the character has the item. `is_looted` is a
+    # different fact - the drop is gone from this roll - and only worth
+    # saying for something not owned, where it is the reason to reroll.
+    gone = item.is_looted and not obj.acquired
+
     box.r2wa_icon.set_from_icon_name("object-select-symbolic")
-    box.r2wa_icon.set_visible(item.is_looted)
+    box.r2wa_icon.set_visible(obj.acquired)
 
     box.r2wa_wiki_url = obj.wiki_url
     box.r2wa_link.set_visible(obj.wiki_url is not None)
 
     box.r2wa_title.set_label(item.name)
-    box.r2wa_title.set_css_classes(["dim-label"] if item.is_looted else [])
+    box.r2wa_title.set_css_classes(["dim-label"] if obj.acquired or gone else [])
 
-    subtitle = " · ".join(_item_notes(item))
+    subtitle = " · ".join(_item_notes(item, gone))
     box.r2wa_subtitle.set_label(subtitle)
     box.r2wa_subtitle.set_visible(bool(subtitle))
 
@@ -813,10 +834,14 @@ def _location_subtitle(location: Location) -> str:
     return " · ".join(marks) if marks else (location.category or "")
 
 
-def _item_notes(item: LootItem) -> list[str]:
+def _item_notes(item: LootItem, gone: bool = False) -> list[str]:
     notes: list[str] = []
     if item.subcategory:
         notes.append(item.subcategory)
+    if gone:
+        # Taken already, or the fork in the road went the other way. Either
+        # way this roll will not hand it over again.
+        notes.append("gone in this roll")
     if item.coop_only:
         notes.append("co-op only")
     if item.is_prerequisite_missing:
@@ -844,7 +869,7 @@ def _build_item_section_sorter() -> Gtk.Sorter:
     return Gtk.CustomSorter.new(compare)
 
 
-def _world_summary(world: World | None) -> str:
+def _world_summary(world: World | None, owned: frozenset[str] = frozenset()) -> str:
     if world is None:
         return ""
 
@@ -854,7 +879,7 @@ def _world_summary(world: World | None) -> str:
     if world.playtime_seconds:
         parts.append(format_playtime(world.playtime_seconds))
 
-    open_items = sum(zone.open_item_count for zone in world.zones)
+    open_items = sum(zone.open_item_count(owned) for zone in world.zones)
     if open_items:
         parts.append(f"{open_items} open")
 

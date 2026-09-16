@@ -76,13 +76,18 @@ class CharacterObject(GObject.Object):
 
 
 class ZoneObject(GObject.Object):
-    """A zone (biome) of a rolled world, shown in the worlds view's first column."""
+    """A zone (biome) of a rolled world, shown in the worlds view's first column.
+
+    ``open_count`` is worked out once when the row is built: it depends on
+    what the character owns, which the zone itself knows nothing about.
+    """
 
     __gtype_name__ = "R2waZoneObject"
 
-    def __init__(self, zone: Zone):
+    def __init__(self, zone: Zone, open_count: int = 0):
         super().__init__()
         self.zone = zone
+        self.open_count = open_count
 
 
 class LocationObject(GObject.Object):
@@ -90,9 +95,10 @@ class LocationObject(GObject.Object):
 
     __gtype_name__ = "R2waLocationObject"
 
-    def __init__(self, location: Location):
+    def __init__(self, location: Location, open_count: int = 0):
         super().__init__()
         self.location = location
+        self.open_count = open_count
 
 
 class LootItemObject(GObject.Object):
@@ -104,6 +110,10 @@ class LootItemObject(GObject.Object):
     ``group_icon_path``/``group_wiki_url`` belong to that heading - only
     vendors and bosses have them, the wiki keeps no page or portrait for a
     "World Drop".
+
+    ``acquired`` is the character's own answer to "do I have this?", which
+    the loot item cannot give: its ``is_looted`` only covers this one world
+    roll. Both are shown, because they mean different things.
     """
 
     __gtype_name__ = "R2waLootItemObject"
@@ -119,9 +129,11 @@ class LootItemObject(GObject.Object):
         group_icon_path: Path | None = None,
         group_wiki_url: str | None = None,
         note: str | None = None,
+        acquired: bool = False,
     ):
         super().__init__()
         self.item = item
+        self.acquired = acquired
         self.group_index = group_index
         self.group_label = group_label
         self.group_type = group_type
