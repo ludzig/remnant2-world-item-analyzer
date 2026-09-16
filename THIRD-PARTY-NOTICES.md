@@ -92,8 +92,11 @@ by the wikis, not by us. Two sources, in this order of preference:
   does redistribute them.
 
   Their terms are not stated anywhere. Rather than assume, the question of
-  whether both this and the two derived CSVs above are welcome has been put
-  to the project's maintainer; the answer will be recorded here.
+  whether both this and the two derived CSVs above are welcome was put to
+  the project's maintainer on 2026-09-16:
+  https://github.com/joshpayette/remnant2-toolkit/issues/248 - still open
+  at the time of writing. Whatever the answer is, it will be honoured and
+  recorded here.
 
 ## Further dependencies of the parser
 
