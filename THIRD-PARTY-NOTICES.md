@@ -62,6 +62,33 @@ metadata (see `src/r2wa/iteminfo.py`). The save-file slug is the reliable
 key - display names differ between the two sources often enough
 ("Judgement" vs. "Judgment") that name comparison alone leaves gaps.
 
+### Permission, asked and given
+
+Whether the two derived files - and the pictures further down - were
+welcome was put to the maintainer rather than assumed:
+https://github.com/joshpayette/remnant2-toolkit/issues/248 (2026-09-16).
+Josh Payette answered the same day. The CSVs may be used "as-is or however
+you wish"; the pictures are the game's own assets he claims no rights over.
+
+One condition came with it, and it is met: the application must not hit the
+toolkit's CDN repeatedly at runtime. It never does. Downloading is a one-off
+developer step (`just fetch-icons`); the application itself only reads local
+files, and the Flatpak ships without `--share=network`, so the packaged app
+has no route to the network at all.
+
+He also asked that the wiki be credited next to the toolkit, and the reason
+is worth quoting rather than paraphrasing:
+
+> Throughout Remnant 2's development and DLC releases, the wiki community
+> and the toolkit community worked together to keep our data accurate and
+> in-sync, refusing to data mine to allow players (and us) to keep some of
+> the magic of discovery alive in the game.
+
+The item data in the two CSVs above therefore does not begin at the toolkit
+either. Much of it was compiled by hand and kept in step by the people at
+the **Remnant 2 Wiki**, https://remnant2.wiki.gg/ - credited again below for
+the pictures, and named here for the data.
+
 ## Item icons and portraits
 
 These are renders and screenshots of the game's own assets, made and hosted
@@ -91,12 +118,9 @@ by the wikis, not by us. Two sources, in this order of preference:
   `packaging/io.github.ludzig.R2wa.yml`) - so handing someone the bundle
   does redistribute them.
 
-  Their terms are not stated anywhere. Rather than assume, the question of
-  whether both this and the two derived CSVs above are welcome was put to
-  the project's maintainer on 2026-09-16:
-  https://github.com/joshpayette/remnant2-toolkit/issues/248 - still open
-  at the time of writing. Whatever the answer is, it will be honoured and
-  recorded here.
+  Their use was asked about and permitted - see "Permission, asked and
+  given" above, including the one condition attached and why this
+  application meets it.
 
 ## Further dependencies of the parser
 

@@ -247,10 +247,13 @@ more than it can keep:
 | | Origin | Terms |
 | --- | --- | --- |
 | `data/manual_icons/` (32 PNG) | [Remnant 2 Wiki](https://remnant2.wiki.gg/) | CC BY-NC-SA 4.0 — **non-commercial**, share alike |
-| `data/iteminfo.csv`, `data/toolkit_items.csv` | [Remnant2Toolkit](https://github.com/joshpayette/remnant2-toolkit) | derived from a **GPL-3.0** project |
+| `data/iteminfo.csv`, `data/toolkit_items.csv` | [Remnant2Toolkit](https://github.com/joshpayette/remnant2-toolkit) (GPL-3.0) | used with the maintainer's explicit permission, [issue #248](https://github.com/joshpayette/remnant2-toolkit/issues/248) |
 
 Reusing those two rows is therefore not simply MIT, whatever this file says
 about the code around them. The item pictures the application downloads at
 build time come from the same two places and are covered by the same terms.
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) has the detail, including
-which fields were taken and why.
+
+Both the data and the pictures trace back to the **Remnant 2 Wiki**, whose
+community compiled them by hand and deliberately kept them free of
+datamining. [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) has the
+detail: which fields were taken, from where, and what was permitted.
