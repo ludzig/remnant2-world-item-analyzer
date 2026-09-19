@@ -11,6 +11,31 @@ campaign, the locations of the selected zone, and its loot - each item with
 its icon, a note on where to find it, and a link to the
 wiki](docs/screenshot.png)
 
+## Install
+
+Download `r2wa.flatpak` from the [latest
+release](https://github.com/ludzig/remnant2-world-item-analyzer/releases/latest)
+and install it:
+
+```bash
+flatpak install --user ./r2wa.flatpak
+```
+
+Nothing else is needed — no .NET, no PyGObject, no build. The bundle is
+built from the sources in this repository with `just flatpak-bundle`.
+
+Two things worth knowing before you start:
+
+- If you don't have the GNOME 49 runtime yet, Flatpak will offer to add
+  Flathub and fetch it. That is a few hundred megabytes, on top of the 53 MB
+  bundle.
+- **A bundle does not update itself.** To move to a newer version, download
+  it from the releases page and install it the same way. Once the
+  application is on Flathub, updates will arrive on their own; see
+  [Flatpak](#flatpak) for what still stands in the way of that.
+
+Everything below is for building it yourself.
+
 ## Architecture
 
 The save game parser only exists as a C# library. Instead of reimplementing
