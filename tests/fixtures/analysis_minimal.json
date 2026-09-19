@@ -72,7 +72,7 @@
       "trait_rank": 85,
       "trait_points": 4,
       "is_hardcore": false,
-      "save_datetime": "2026-01-10T18:26:02Z",
+      "save_date_time": "2026-01-10T18:26:02Z",
       "active_world_slot": "campaign",
       "playtime_seconds": 57420.0,
       "counts": {
@@ -206,7 +206,7 @@
       "item_level": 4,
       "trait_rank": 6,
       "is_hardcore": true,
-      "save_datetime": "2026-01-15T23:33:14Z",
+      "save_date_time": "2026-01-15T23:33:14Z",
       "active_world_slot": "adventure",
       "playtime_seconds": 17640.0,
       "counts": {

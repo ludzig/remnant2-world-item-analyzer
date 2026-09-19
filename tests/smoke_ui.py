@@ -31,7 +31,7 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, GLib, Gtk  # noqa: E402
 
-from r2wa.models import Analysis  # noqa: E402
+from r2wa.models import Analysis, format_age  # noqa: E402
 from r2wa.views.items import ItemsView, Scope, Status  # noqa: E402
 from r2wa.views.worlds import PORTRAIT_GROUP_TYPES, ItemStatus, WorldsView  # noqa: E402
 
@@ -131,6 +131,19 @@ def pump_search(view: ItemsView, needle: str, expected: int) -> None:
 def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
     character = analysis.active_character
     print(f"\nCharacter: {character.title}, {len(character.items)} items")
+
+    # The save timestamp. Worth checking against a real save rather than a
+    # fixture: it was silently None for every character because the model
+    # read `save_datetime` while the parser writes `save_date_time`, and the
+    # hand-written fixture carried the same typo, so nothing noticed.
+    stamps = [(c.index, c.save_datetime) for c in analysis.characters]
+    without = [index for index, stamp in stamps if stamp is None]
+    check(not without, f"every character carries a save timestamp (missing: {without})")
+    if character.save_datetime is not None:
+        print(
+            f"  (saved {character.save_datetime.astimezone():%Y-%m-%d %H:%M:%S}"
+            f" - {format_age(character.save_datetime)})"
+        )
 
     items_view = ItemsView()
     worlds_view = WorldsView()

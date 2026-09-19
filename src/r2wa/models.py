@@ -414,7 +414,10 @@ class Character:
             trait_rank=data.get("trait_rank", 0),
             trait_points=data.get("trait_points", 0),
             is_hardcore=data.get("is_hardcore", False),
-            save_datetime=_parse_datetime(data.get("save_datetime")),
+            # The parser serialises `SaveDateTime` in snake_case, which makes
+            # it `save_date_time` - not `save_datetime`. Reading the wrong
+            # one left this silently None for every character.
+            save_datetime=_parse_datetime(data.get("save_date_time")),
             active_world_slot=data.get("active_world_slot", "campaign"),
             playtime_seconds=data.get("playtime_seconds"),
             counts=Counts.from_json(data.get("counts") or {}),
@@ -552,6 +555,41 @@ def format_playtime(seconds: float | None) -> str:
     total_minutes = int(seconds // 60)
     hours, minutes = divmod(total_minutes, 60)
     return f"{hours} h {minutes:02d} min" if hours else f"{minutes} min"
+
+
+def format_age(when: datetime | None, now: datetime | None = None) -> str:
+    """How long ago *when* was, in words - ``3 minutes ago``.
+
+    Deliberately coarse. The question this answers is "is what I am looking
+    at the game's current state, or has the game not written yet?", and
+    seconds are no help with that.
+
+    Returns an empty string when there is nothing to say, so the caller can
+    hide the label rather than show a placeholder.
+    """
+    if when is None:
+        return ""
+
+    now = now or datetime.now(when.tzinfo)
+    # A clock a little out of step must not produce "in 3 minutes".
+    seconds = max((now - when).total_seconds(), 0.0)
+
+    minutes = int(seconds // 60)
+    if minutes < 1:
+        return "just now"
+    if minutes < 60:
+        return "1 minute ago" if minutes == 1 else f"{minutes} minutes ago"
+
+    hours = minutes // 60
+    if hours < 24:
+        return "1 hour ago" if hours == 1 else f"{hours} hours ago"
+
+    days = hours // 24
+    if days == 1:
+        return "yesterday"
+    if days < 7:
+        return f"{days} days ago"
+    return when.astimezone().strftime("%Y-%m-%d")
 
 
 def _parse_datetime(value: str | None) -> datetime | None:

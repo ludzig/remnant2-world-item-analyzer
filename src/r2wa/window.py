@@ -13,7 +13,7 @@ from gi.repository import Adw, Gio, GLib, Gtk, Pango  # noqa: E402
 
 from .config import Settings  # noqa: E402
 from .discovery import SaveLocation, discover  # noqa: E402
-from .models import Analysis, Character, format_playtime  # noqa: E402
+from .models import Analysis, Character, format_age, format_playtime  # noqa: E402
 from .parser_bridge import ParserError, analyze_async  # noqa: E402
 from .views.items import ItemsView  # noqa: E402
 from .views.worlds import WorldsView  # noqa: E402
@@ -21,6 +21,10 @@ from .views.worlds import WorldsView  # noqa: E402
 #: Delay after a file change before re-analyzing. The game writes several
 #: files in quick succession when saving.
 RELOAD_DEBOUNCE_MS = 2000
+
+#: How often the "Saved N minutes ago" label is refreshed. It counts in
+#: whole minutes, so anything below a minute is wasted work.
+SAVE_AGE_REFRESH_S = 20
 
 #: Window size on first ever start, before any size has been remembered.
 DEFAULT_WIDTH = 1100
@@ -43,6 +47,8 @@ class Window(Adw.ApplicationWindow):
         self._explicit_save_dir = save_dir or self._settings.save_dir
         self._monitor: Gio.FileMonitor | None = None
         self._reload_source: int | None = None
+        self._save_age_source: int | None = None
+        self._character: Character | None = None
         self._loading = False
 
         self.set_default_size(
@@ -137,6 +143,15 @@ class Window(Adw.ApplicationWindow):
 
         self._spinner = Gtk.Spinner(visible=False)
         header.pack_start(self._spinner)
+
+        # Remnant 2 does not write its save when an item is picked up - it
+        # writes every few minutes and at events such as dying. Without
+        # saying how old the save is, a checkmark that has not appeared yet
+        # looks like this application lagging behind, when it is the game
+        # that has not written.
+        self._save_age = Gtk.Label(css_classes=["dim-label"], visible=False)
+        header.pack_start(self._save_age)
+        self._save_age_source = GLib.timeout_add_seconds(SAVE_AGE_REFRESH_S, self._update_save_age)
 
         return header
 
@@ -315,8 +330,26 @@ class Window(Adw.ApplicationWindow):
         self._show_character(character)
 
     def _show_character(self, character: Character | None) -> None:
+        self._character = character
         self._items_view.set_analysis(self._analysis, character)
         self._worlds_view.set_analysis(self._analysis, character)
+        self._update_save_age()
+
+    def _update_save_age(self) -> bool:
+        """Show how long ago the game last wrote the save on screen."""
+        stamp = self._character.save_datetime if self._character else None
+        age = format_age(stamp)
+
+        self._save_age.set_visible(bool(age))
+        self._save_age.set_label(f"Saved {age}" if age else "")
+        if stamp is not None:
+            self._save_age.set_tooltip_text(
+                f"The game last wrote this save at {stamp.astimezone():%H:%M:%S}. "
+                "It saves every few minutes and at events such as dying, not "
+                "when you pick something up."
+            )
+
+        return GLib.SOURCE_CONTINUE
 
     # ------------------------------------------------------------------
     # Folder selection and file monitoring
@@ -392,6 +425,9 @@ class Window(Adw.ApplicationWindow):
 
     def do_close_request(self) -> bool:
         self._cancel_pending_reload()
+        if self._save_age_source is not None:
+            GLib.source_remove(self._save_age_source)
+            self._save_age_source = None
         if self._monitor is not None:
             self._monitor.cancel()
             self._monitor = None

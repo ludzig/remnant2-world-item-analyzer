@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from r2wa import models  # noqa: E402
-from r2wa.models import Analysis  # noqa: E402
+from r2wa.models import Analysis, CatalogItem, Character, format_age  # noqa: E402
 
 FIXTURE = Path(__file__).parent / "fixtures" / "analysis_minimal.json"
 
@@ -91,6 +92,26 @@ class TestCharacter:
         stamp = analysis.character(0).save_datetime
         assert stamp is not None
         assert (stamp.year, stamp.month, stamp.day) == (2026, 1, 10)
+
+    def test_zeitstempel_kommt_aus_dem_schluessel_des_parsers(self) -> None:
+        """The parser writes `save_date_time`, not `save_datetime`.
+
+        It serialises C# `SaveDateTime` in snake_case, which puts an
+        underscore before `time` as well. Reading the shorter spelling left
+        the timestamp silently None for every character - and the fixture
+        used to carry the same typo, so nothing noticed.
+        """
+        catalog = {"X": CatalogItem(id="X", name="X", category="ring")}
+
+        parser_spelling = Character.from_json(
+            {"index": 0, "save_date_time": "2026-09-19T16:03:55Z"}, catalog
+        )
+        wrong_spelling = Character.from_json(
+            {"index": 0, "save_datetime": "2026-09-19T16:03:55Z"}, catalog
+        )
+
+        assert parser_spelling.save_datetime is not None
+        assert wrong_spelling.save_datetime is None
 
     def test_zustand_ohne_katalogeintrag_wird_uebersprungen(self) -> None:
         character = models.Character.from_json(
@@ -252,6 +273,44 @@ class TestWelten:
         assert campaign.zones[0].locations[0].loot_groups[0].label == "Reggie"
         # Without a name, the event reference takes over.
         assert campaign.zones[1].locations[0].loot_groups[0].label == "Quest_Yaesha_Empress"
+
+
+class TestAlter:
+    @pytest.mark.parametrize(
+        ("minuten", "erwartet"),
+        [
+            (0, "just now"),
+            (0.5, "just now"),
+            (1, "1 minute ago"),
+            (3, "3 minutes ago"),
+            (59, "59 minutes ago"),
+            (60, "1 hour ago"),
+            (150, "2 hours ago"),
+            (60 * 24, "yesterday"),
+            (60 * 24 * 3, "3 days ago"),
+        ],
+    )
+    def test_alter_in_worten(self, minuten: float, erwartet: str) -> None:
+        now = datetime(2026, 9, 19, 18, 0, 0, tzinfo=UTC)
+        when = now - timedelta(minutes=minuten)
+
+        assert format_age(when, now) == erwartet
+
+    def test_ohne_zeitstempel_bleibt_es_leer(self) -> None:
+        """The caller hides the label instead of showing a placeholder."""
+        assert format_age(None) == ""
+
+    def test_eine_vorgehende_uhr_behauptet_keine_zukunft(self) -> None:
+        now = datetime(2026, 9, 19, 18, 0, 0, tzinfo=UTC)
+        when = now + timedelta(minutes=5)
+
+        assert format_age(when, now) == "just now"
+
+    def test_alte_staende_nennen_das_datum(self) -> None:
+        now = datetime(2026, 9, 19, 18, 0, 0, tzinfo=UTC)
+        when = now - timedelta(days=40)
+
+        assert format_age(when, now) == when.astimezone().strftime("%Y-%m-%d")
 
 
 class TestFormat:
