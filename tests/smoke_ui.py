@@ -341,7 +341,7 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
             # items view asks - does the character have it - not whether
             # this one drop is still lying there.
             owned = with_world.owned_ids
-            missing = sum(1 for i in first_location.items if i.id not in owned)
+            missing = sum(1 for i in first_location.items if i.is_collectible and i.id not in owned)
             worlds_view._on_item_status_changed(ItemStatus.MISSING)
             pump()
             check(
@@ -515,6 +515,47 @@ def run_checks(analysis: Analysis, show: bool, save_dir: str | None) -> None:
         worlds_view._only_open = False
         worlds_view._zone_filter.changed(Gtk.FilterChange.DIFFERENT)
         worlds_view._location_filter.changed(Gtk.FilterChange.DIFFERENT)
+        pump()
+
+    # Quest items and materials: nothing can tick them off, so they get a
+    # marker of their own and stay out of "Missing" - Memory Core II used
+    # to sit there as missing forever after it had been picked up.
+    quest_spot = next(
+        (
+            (other, world.slot, zone_index, location_index, location)
+            for other in analysis.characters
+            for world in other.worlds
+            for zone_index, zone in enumerate(world.zones)
+            for location_index, location in enumerate(zone.locations)
+            if any(not item.is_collectible for item in location.items)
+        ),
+        None,
+    )
+    if quest_spot is None:
+        print("  (no quest item in any rolled world, skipping)")
+    else:
+        other, slot, zone_index, location_index, location = quest_spot
+        worlds_view.set_analysis(analysis, other)
+        worlds_view._set_slot(slot)
+        pump()
+        worlds_view._zone_selection.set_selected(zone_index)
+        pump()
+        worlds_view._location_selection.set_selected(location_index)
+        pump()
+        quest_names = [i.name for i in location.items if not i.is_collectible]
+        check(
+            any(obj.item.name in quest_names for obj in worlds_view._item_model),
+            f"{location.name} lists {quest_names[0]} under 'All'",
+        )
+        worlds_view._on_item_status_changed(ItemStatus.MISSING)
+        pump()
+        check(
+            all(obj.item.is_collectible for obj in worlds_view._item_model),
+            "... and leaves it out of 'Missing'",
+        )
+        worlds_view._on_item_status_changed(ItemStatus.ALL)
+        worlds_view.set_analysis(analysis, with_world)
+        worlds_view._set_slot("campaign")
         pump()
 
     if with_world.world("adventure"):

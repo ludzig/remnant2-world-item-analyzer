@@ -242,6 +242,22 @@ class LootItem:
             coop_only=data.get("coop_only", False),
         )
 
+    @property
+    def is_collectible(self) -> bool:
+        """Whether the item can ever show up as owned.
+
+        Quest items and materials appear in the loot lists as hints - a key
+        for a door, a core for a console - but the parser leaves them out of
+        the character's item states, and the library doesn't flag them as
+        looted either. Many are used up again anyway. Nothing can tick them
+        off, so they must not count as open loot.
+        """
+        return self.category not in NON_COLLECTIBLE_CATEGORIES
+
+
+#: Loot categories the parser does not track per character.
+NON_COLLECTIBLE_CATEGORIES = frozenset({"quest_item", "material"})
+
 
 @dataclass(frozen=True, slots=True)
 class LootGroup:
@@ -309,10 +325,11 @@ class Location:
         reward was chosen, so it is gone from *this* roll. It says nothing
         about whether the player owns the item, which they may well do from
         an earlier roll, the other mode or a vendor. An item already owned
-        is not worth a trip either.
+        is not worth a trip either. Quest items and materials never count,
+        see :attr:`LootItem.is_collectible`.
         """
         for item in self.items:
-            if item.id not in owned and not item.is_looted:
+            if item.is_collectible and item.id not in owned and not item.is_looted:
                 yield item
 
     def open_item_count(self, owned: Collection[str] = ()) -> int:

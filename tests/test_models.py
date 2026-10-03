@@ -260,6 +260,43 @@ class TestWelten:
         assert location.open_item_count({still_open.id}) == 0
         assert still_open.is_looted is False
 
+    def test_quest_items_und_material_zaehlen_nicht_als_offen(self) -> None:
+        """Nothing can tick off a quest item, so it must not stay open forever.
+
+        The case behind this: Memory Core II, picked up in the Dormant
+        N'Erudian Facility and still reported with `is_looted` false.
+        """
+        location = models.Location.from_json(
+            {
+                "name": "Dormant N'Erudian Facility",
+                "loot_groups": [
+                    {
+                        "type": "dungeon",
+                        "items": [
+                            {
+                                "id": "Quest_Item_Extermination_AICore",
+                                "name": "Memory Core II",
+                                "category": "quest_item",
+                            },
+                            {
+                                "id": "Material_ShinningEssenceEcho",
+                                "name": "Shining Essence Echo",
+                                "category": "material",
+                            },
+                            {"id": "MetaGem_Failsafe", "name": "Failsafe", "category": "mutator"},
+                        ],
+                    }
+                ],
+            }
+        )
+
+        quest_item, material, mutator = location.items
+        assert not quest_item.is_collectible
+        assert not material.is_collectible
+        assert mutator.is_collectible
+        assert [item.name for item in location.open_items()] == ["Failsafe"]
+        assert location.open_item_count() == 1
+
     def test_owned_ids_nennt_nur_vorhandenes(self, analysis: Analysis) -> None:
         character = analysis.character(0)
         owned = character.owned_ids

@@ -236,7 +236,10 @@ class WorldsView(Gtk.Box):
         item = obj.item
         # "Missing"/"Found" ask the same question the items view asks: does
         # the character have it? Not whether this one drop is still lying
-        # there, which is what `is_looted` answers.
+        # there, which is what `is_looted` answers. Quest items and
+        # materials have no answer to that, so they only show under "All".
+        if self._item_status is not ItemStatus.ALL and not item.is_collectible:
+            return False
         if self._item_status is ItemStatus.MISSING and obj.acquired:
             return False
         if self._item_status is ItemStatus.FOUND and not obj.acquired:
@@ -716,8 +719,17 @@ def _bind_item_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem)
     # saying for something not owned, where it is the reason to reroll.
     gone = item.is_looted and not obj.acquired
 
-    box.r2wa_icon.set_from_icon_name("object-select-symbolic")
-    box.r2wa_icon.set_visible(obj.acquired)
+    # Quest items and materials get a marker of their own instead: the
+    # save doesn't say whether the character has them, so neither a
+    # checkmark nor its absence would be true.
+    if item.is_collectible:
+        box.r2wa_icon.set_from_icon_name("object-select-symbolic")
+        box.r2wa_icon.set_tooltip_text(None)
+        box.r2wa_icon.set_visible(obj.acquired)
+    else:
+        box.r2wa_icon.set_from_icon_name("emoji-flags-symbolic")
+        box.r2wa_icon.set_tooltip_text("Not tracked - the save game doesn't record it")
+        box.r2wa_icon.set_visible(True)
 
     box.r2wa_wiki_url = obj.wiki_url
     box.r2wa_link.set_visible(obj.wiki_url is not None)
@@ -838,6 +850,10 @@ def _item_notes(item: LootItem, gone: bool = False) -> list[str]:
     notes: list[str] = []
     if item.subcategory:
         notes.append(item.subcategory)
+    if item.category == "quest_item":
+        notes.append("quest item")
+    elif item.category == "material":
+        notes.append("material")
     if gone:
         # Taken already, or the fork in the road went the other way. Either
         # way this roll will not hand it over again.
