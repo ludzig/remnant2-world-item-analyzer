@@ -200,11 +200,17 @@ class ItemsView(Gtk.Box):
         header.connect("clicked", self._on_category_clicked)
         box.append(header)
 
+        # Adw.ActionRow is a Gtk.ListBoxRow and warns once per instance when
+        # its parent is anything but a Gtk.ListBox - a few hundred lines in
+        # the journal on every reload. A one-row list box keeps it quiet.
         row = _build_item_row()
-        box.append(row)
+        row_holder = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        row_holder.append(row)
+        box.append(row_holder)
 
         box.r2wa_header = header
         box.r2wa_item = row
+        box.r2wa_item_holder = row_holder
 
         list_item.set_child(box)
 
@@ -215,7 +221,7 @@ class ItemsView(Gtk.Box):
 
         is_category = isinstance(obj, CategoryObject)
         box.r2wa_header.set_visible(is_category)
-        box.r2wa_item.set_visible(not is_category)
+        box.r2wa_item_holder.set_visible(not is_category)
 
         if is_category:
             self._bind_category(box.r2wa_header, tree_row, obj)
