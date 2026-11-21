@@ -19,6 +19,18 @@ def open_uri(url: str | None) -> None:
         pass
 
 
+def open_wiki_link(button: Gtk.Button) -> None:
+    """Click handler for the wiki buttons in recycled list rows.
+
+    The URL is read from the button at click time: rows are recycled while
+    scrolling, so a fresh item can be bound to the same button between setup
+    and a later click. A module-level function on purpose - a closure over
+    the row would be held by the button's own signal, a cycle through C that
+    Python's GC cannot see, and every row ever built would stay in memory.
+    """
+    open_uri(getattr(button, "r2wa_wiki_url", None))
+
+
 def toggle_group(
     entries: list[tuple[str, object]],
     active: object,

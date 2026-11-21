@@ -29,7 +29,7 @@ from ..models import (  # noqa: E402
     Zone,
     format_playtime,
 )
-from .widgets import open_uri, toggle_group  # noqa: E402
+from .widgets import open_wiki_link, toggle_group  # noqa: E402
 
 #: Side length of an item's icon in the third column - matches the Items view.
 ICON_SIZE = 32
@@ -698,11 +698,8 @@ def _bind_location_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListI
 
 def _setup_item_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
     box = _build_info_row(with_picture=True, with_link=True, with_note=True)
-    box.r2wa_wiki_url = None
-    # The URL to open lives on the row, not baked into the closure: rows
-    # are recycled while scrolling, so a fresh item can be bound to the
-    # same button between setup and a later click.
-    box.r2wa_link.connect("clicked", lambda _button: open_uri(box.r2wa_wiki_url))
+    box.r2wa_link.r2wa_wiki_url = None
+    box.r2wa_link.connect("clicked", open_wiki_link)
     list_item.set_child(box)
 
 
@@ -731,7 +728,7 @@ def _bind_item_row(_factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem)
         box.r2wa_icon.set_tooltip_text("Not tracked - the save game doesn't record it")
         box.r2wa_icon.set_visible(True)
 
-    box.r2wa_wiki_url = obj.wiki_url
+    box.r2wa_link.r2wa_wiki_url = obj.wiki_url
     box.r2wa_link.set_visible(obj.wiki_url is not None)
 
     box.r2wa_title.set_label(item.name)
@@ -782,10 +779,8 @@ def _setup_item_header(_factory: Gtk.SignalListItemFactory, list_header: Gtk.Lis
     box.r2wa_title = title
     box.r2wa_kind = kind
     box.r2wa_link = link
-    # Same reason as on the item rows: headers are recycled, so the URL has
-    # to be read at click time rather than captured now.
-    box.r2wa_wiki_url = None
-    link.connect("clicked", lambda _button: open_uri(box.r2wa_wiki_url))
+    link.r2wa_wiki_url = None
+    link.connect("clicked", open_wiki_link)
 
     list_header.set_child(box)
 
@@ -800,7 +795,7 @@ def _bind_item_header(_factory: Gtk.SignalListItemFactory, list_header: Gtk.List
         box.r2wa_avatar.set_text(obj.group_label)
         box.r2wa_avatar.set_custom_image(_portrait_texture(obj.group_icon_path))
 
-    box.r2wa_wiki_url = obj.group_wiki_url
+    box.r2wa_link.r2wa_wiki_url = obj.group_wiki_url
     box.r2wa_link.set_visible(obj.group_wiki_url is not None)
 
     box.r2wa_title.set_label(obj.group_label)

@@ -23,7 +23,7 @@ from ..models import (  # noqa: E402
     category_sort_key,
     counts_for,
 )
-from .widgets import open_uri, toggle_group  # noqa: E402
+from .widgets import open_wiki_link, toggle_group  # noqa: E402
 
 #: Side length of the item icon in the row.
 ICON_SIZE = 32
@@ -265,7 +265,7 @@ class ItemsView(Gtk.Box):
         link: Gtk.Button = row.r2wa_link
         wiki_url = self._wiki_urls.get(item.id)
         link.set_visible(wiki_url is not None)
-        row.r2wa_wiki_url = wiki_url
+        link.r2wa_wiki_url = wiki_url
 
         check: Gtk.Image = row.r2wa_check
         check.set_from_icon_name("object-select-symbolic" if item.acquired else "checkbox-symbolic")
@@ -619,9 +619,6 @@ def _build_item_row() -> Adw.ActionRow:
     badges = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6, valign=Gtk.Align.CENTER)
     suffix.append(badges)
 
-    # The URL to open lives on the row, not baked into the closure below:
-    # rows are recycled while scrolling, so a fresh item can be bound to the
-    # same button between setup and a later click.
     link = Gtk.Button(
         icon_name="web-browser-symbolic",
         css_classes=["flat"],
@@ -630,7 +627,8 @@ def _build_item_row() -> Adw.ActionRow:
         visible=False,
         cursor=Gdk.Cursor.new_from_name("pointer"),
     )
-    link.connect("clicked", lambda _button: open_uri(row.r2wa_wiki_url))
+    link.r2wa_wiki_url = None
+    link.connect("clicked", open_wiki_link)
     suffix.append(link)
 
     # Keep references on the widget itself, not on the Gtk.ListItem: rows
@@ -639,7 +637,6 @@ def _build_item_row() -> Adw.ActionRow:
     row.r2wa_check = check
     row.r2wa_badges = badges
     row.r2wa_link = link
-    row.r2wa_wiki_url = None
 
     return row
 
